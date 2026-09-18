@@ -10,9 +10,18 @@ public final class BrewState: ObservableObject {
     @Published public var installedPackages: [InstalledPackage] = []
     
     @Published public var isLoading: Bool = false
+    @Published public var isRefreshSuccess: Bool = false
+    @Published public var isUpdatingBrew: Bool = false
+    @Published public var isUpdateSuccess: Bool = false
     @Published public var isUpdatingAll: Bool = false
+    @Published public var showUpdatesOnly: Bool = false
     @Published public var updatingPackageNames: Set<String> = []
     @Published public var errorMessage: String? = nil
+    
+    // Discover State
+    @Published public var searchResults: [BrewPackage] = []
+    @Published public var isSearching: Bool = false
+    @Published public var installingPackages: Set<String> = []
     
     private let service = BrewService()
     private var host: DropletHost?
@@ -43,25 +52,41 @@ public final class BrewState: ObservableObject {
             let (fetchedVersion, outdatedRes, installedRes) = try await (v, o, i)
             
             self.version = fetchedVersion
-            self.outdatedPackages = outdatedRes.formulae + outdatedRes.casks
-            self.installedPackages = installedRes.formulae + installedRes.casks
+            self.outdatedPackages = outdatedRes.formulae + outdatedRes.casks.map { var c = $0; c.isCask = true; return c }
+            self.installedPackages = installedRes.formulae + installedRes.casks.map { var c = $0; c.isCask = true; return c }
         } catch {
             self.errorMessage = error.localizedDescription
             self.host?.log.error("BrewState refresh failed: \(error.localizedDescription)")
         }
         
         isLoading = false
+        
+        if errorMessage == nil {
+            isRefreshSuccess = true
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                isRefreshSuccess = false
+            }
+        }
     }
     
     public func updateBrew() async {
-        isLoading = true
+        isUpdatingBrew = true
         do {
             try await service.updateBrew(executable: executablePath)
             await refresh()
         } catch {
             self.errorMessage = "Update failed: \(error.localizedDescription)"
         }
-        isLoading = false
+        isUpdatingBrew = false
+        
+        if errorMessage == nil {
+            isUpdateSuccess = true
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                isUpdateSuccess = false
+            }
+        }
     }
     
     public func upgradeAll() async {
@@ -128,5 +153,39 @@ public final class BrewState: ObservableObject {
             self.errorMessage = "Uninstall failed for \(package.name): \(error.localizedDescription)"
         }
         updatingPackageNames.remove(package.name)
+    }
+    
+    public func search(query: String) async {
+        isSearching = true
+        errorMessage = nil
+        do {
+            self.searchResults = try await service.searchPackages(executable: executablePath, query: query)
+        } catch {
+            self.errorMessage = "Search failed: \(error.localizedDescription)"
+            self.searchResults = []
+        }
+        isSearching = false
+    }
+    
+    public func install(package: BrewPackage) async {
+        installingPackages.insert(package.name)
+        do {
+            try await service.installPackage(executable: executablePath, name: package.name)
+            await refresh()
+            _ = host?.hud.present(DropletHUDRequest(
+                id: "brewmanager-hud",
+                accessibilityLabel: "Installed \(package.name)",
+                isExpanded: true,
+                content: {
+                    Image.brewIcon.resizable().scaledToFit().frame(width: 16, height: 16)
+                },
+                expanded: {
+                    BrewHUDView(message: "Installed \(package.name)")
+                }
+            ))
+        } catch {
+            self.errorMessage = "Install failed for \(package.name): \(error.localizedDescription)"
+        }
+        installingPackages.remove(package.name)
     }
 }

@@ -2,11 +2,19 @@ import Foundation
 import OSLog
 import DroppyKit
 
+public struct BrewPackage: Identifiable, Hashable, Sendable {
+    public var id: String { name }
+    public let name: String
+    public let description: String?
+    public let isCask: Bool
+}
+
 public struct OutdatedPackage: Decodable, Identifiable, Hashable, Sendable {
     public var id: String { name }
     public let name: String
     public let installedVersions: [String]
     public let currentVersion: String
+    public var isCask: Bool = false
     
     enum CodingKeys: String, CodingKey {
         case name
@@ -45,6 +53,7 @@ public struct InstalledPackage: Decodable, Identifiable, Hashable, Sendable {
     public let name: String
     public let installed: [InstalledPackageVersion]?
     public let version: String?
+    public var isCask: Bool = false
     
     enum CodingKeys: String, CodingKey {
         case name
@@ -128,6 +137,45 @@ public final class BrewService {
     
     public func uninstallPackage(executable: String, name: String) async throws {
         _ = try await runCommand(executable: executable, arguments: ["uninstall", name])
+    }
+    
+    public func installPackage(executable: String, name: String) async throws {
+        _ = try await runCommand(executable: executable, arguments: ["install", name])
+    }
+    
+    public func searchPackages(executable: String, query: String) async throws -> [BrewPackage] {
+        let output = try await runCommand(executable: executable, arguments: ["search", "--desc", query])
+        
+        var results: [BrewPackage] = []
+        var parsingCasks = false
+        
+        for line in output.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+            
+            if trimmed.hasPrefix("==> Casks") {
+                parsingCasks = true
+                continue
+            } else if trimmed.hasPrefix("==> Formulae") {
+                parsingCasks = false
+                continue
+            } else if trimmed.hasPrefix("==>") {
+                continue // Skip other headers
+            }
+            
+            // Expected format: "name: description"
+            if let colonIndex = trimmed.firstIndex(of: ":") {
+                let name = String(trimmed[..<colonIndex]).trimmingCharacters(in: .whitespaces)
+                let descStart = trimmed.index(after: colonIndex)
+                let description = String(trimmed[descStart...]).trimmingCharacters(in: .whitespaces)
+                
+                results.append(BrewPackage(name: name, description: description, isCask: parsingCasks))
+            } else {
+                // Sometime search results without description can appear
+                results.append(BrewPackage(name: trimmed, description: nil, isCask: parsingCasks))
+            }
+        }
+        return results
     }
     
     private func runCommand(executable: String, arguments: [String]) async throws -> String {

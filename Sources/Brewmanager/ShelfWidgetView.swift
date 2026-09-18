@@ -59,9 +59,18 @@ struct ShelfWidgetView: View {
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.red)
                         } else if state.outdatedPackages.isEmpty {
-                            Text("All brews are updated")
-                                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
+                            HStack {
+                                Text("All brews are updated")
+                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
+                                Spacer()
+                                if !state.isLoading && !state.isUpdatingBrew {
+                                    Button("Update Brew") {
+                                        Task { await state.updateBrew() }
+                                    }
+                                    .buttonStyle(DroppyQuietButtonStyle(size: .small))
+                                }
+                            }
                         } else {
                             Text("\(state.outdatedPackages.count) updates available")
                                 .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -73,27 +82,26 @@ struct ShelfWidgetView: View {
                             .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
                     }
                     
-                    if state.isLoading {
+                    if state.isLoading || state.isUpdatingBrew {
                         HStack {
                             ProgressView()
                                 .scaleEffect(0.8)
                             Spacer()
                         }
-                    } else {
+                    } else if !state.outdatedPackages.isEmpty {
                         HStack(spacing: DroppySpacing.sm) {
                             Button("Update Brew") {
                                 Task { await state.updateBrew() }
                             }
                             .buttonStyle(DroppyQuietButtonStyle(size: .small))
                             
-                            if !state.outdatedPackages.isEmpty {
-                                Button("Update All") {
-                                    Task { await state.upgradeAll() }
-                                }
-                                .buttonStyle(DroppyAccentButtonStyle(size: .small))
+                            Button("Update All") {
+                                Task { await state.upgradeAll() }
                             }
+                            .buttonStyle(DroppyAccentButtonStyle(size: .small))
                             
                             Button("View Details") {
+                                state.showUpdatesOnly = true
                                 if let host = droplet.host {
                                     host.workspace.openSettings()
                                 }

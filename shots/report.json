@@ -13,17 +13,20 @@
   "capabilities" : {
     "declared" : [
       "expanded-surface",
-      "apple-events"
+      "apple-events",
+      "hud"
     ],
     "granted" : [
       "apple-events",
-      "expanded-surface"
+      "expanded-surface",
+      "hud"
     ]
   },
   "droplet" : {
     "capabilities" : [
       "expanded-surface",
-      "apple-events"
+      "apple-events",
+      "hud"
     ],
     "category" : "Productivity",
     "creator" : "Dinanath Dash",
@@ -39,14 +42,15 @@
     "surfaces" : [
       "shelf-widget",
       "expanded-surface",
-      "settings-pane"
+      "settings-pane",
+      "hud"
     ],
     "typeID" : "brewmanager",
     "version" : "1.0.1"
   },
   "expandedSurfaces" : [
     {
-      "id" : "brewmanager-detail",
+      "id" : "expanded-surface",
       "systemImage" : "cup.and.saucer.fill",
       "title" : "Brew Manager"
     }
@@ -64,7 +68,7 @@
   },
   "log" : [
     {
-      "at" : "2026-09-18T15:09:50Z",
+      "at" : "2026-09-18T18:39:42Z",
       "level" : "info",
       "message" : "Brewmanager activated"
     }
@@ -127,10 +131,10 @@
       "verdict" : "provided"
     },
     {
-      "declared" : false,
-      "implemented" : false,
+      "declared" : true,
+      "implemented" : true,
       "surface" : "hud",
-      "verdict" : "not-provided"
+      "verdict" : "provided"
     },
     {
       "declared" : false,
