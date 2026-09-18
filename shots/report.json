@@ -38,7 +38,7 @@
     },
     "minAppVersion" : "15.3.0",
     "name" : "Brew Manager",
-    "summary" : "One line about Brewmanager",
+    "summary" : "Manage your Homebrew packages directly from the Dynamic Island",
     "surfaces" : [
       "shelf-widget",
       "expanded-surface",
@@ -68,7 +68,7 @@
   },
   "log" : [
     {
-      "at" : "2026-09-18T18:39:42Z",
+      "at" : "2026-09-18T18:50:17Z",
       "level" : "info",
       "message" : "Brewmanager activated"
     }
@@ -76,10 +76,10 @@
   "manifest" : {
     "loaded" : true,
     "path" : "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/droplet.json",
-    "problem" : null
+    "problem" : "summary is 62 characters; the Store row shows 60."
   },
   "problems" : [
-
+    "droplet.json: summary is 62 characters; the Store row shows 60."
   ],
   "schema" : "droppykit-harness-report\/1",
   "shelfWidgets" : [
@@ -149,5 +149,5 @@
       "verdict" : "not-provided"
     }
   ],
-  "verdict" : "ok"
+  "verdict" : "problems"
 }

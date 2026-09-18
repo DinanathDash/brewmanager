@@ -3,6 +3,13 @@
 A Droplet for [Droppy](https://getdroppy.app), built with
 [DroppyKit](https://getdroppy.app/docs/droppykit).
 
+## Features
+
+- **Discover & Install**: Search and install Homebrew packages directly from the Droplet settings pane.
+- **Update & Delete**: Update Outdated packages or uninstall unused packages.
+- **Visual Badges**: Easily identify Formula vs Cask packages.
+- **Droppy UI**: Fully integrated with the Droppy design language for a seamless experience.
+
 ## Developing
 
 ```bash

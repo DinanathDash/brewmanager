@@ -205,6 +205,12 @@ struct SettingsPaneView: View {
                                                             .font(.system(size: 12))
                                                             .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
                                                     }
+                                                    if let desc = pkg.desc {
+                                                        Text(desc)
+                                                            .font(.system(size: 11))
+                                                            .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText.opacity(0.8))
+                                                            .lineLimit(1)
+                                                    }
                                                 }
                                                 Spacer()
                                                 

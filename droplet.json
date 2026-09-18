@@ -2,8 +2,8 @@
   "id": "brewmanager",
   "name": "Brew Manager",
   "version": "1.0.1",
-  "summary": "One line about Brewmanager",
-  "description": "A longer description, in plain paragraphs.",
+  "summary": "Manage Homebrew packages directly from the Dynamic Island",
+  "description": "Brew Manager is a powerful and elegant way to update, delete, and discover Homebrew packages right from your Mac's notch or menu bar.",
   "category": "Productivity",
   "kit": {
     "abi": 1,

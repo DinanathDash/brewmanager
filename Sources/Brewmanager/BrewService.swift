@@ -53,6 +53,7 @@ public struct InstalledPackage: Decodable, Identifiable, Hashable, Sendable {
     public let name: String
     public let installed: [InstalledPackageVersion]?
     public let version: String?
+    public let desc: String?
     public var isCask: Bool = false
     
     enum CodingKeys: String, CodingKey {
@@ -60,6 +61,7 @@ public struct InstalledPackage: Decodable, Identifiable, Hashable, Sendable {
         case token
         case installed
         case version
+        case desc
     }
     
     public init(from decoder: Decoder) throws {
@@ -75,6 +77,7 @@ public struct InstalledPackage: Decodable, Identifiable, Hashable, Sendable {
         }
         self.installed = try? container.decodeIfPresent([InstalledPackageVersion].self, forKey: .installed)
         self.version = try? container.decodeIfPresent(String.self, forKey: .version)
+        self.desc = try? container.decodeIfPresent(String.self, forKey: .desc)
     }
 }
 
