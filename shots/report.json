@@ -1,0 +1,151 @@
+{
+  "activation" : {
+    "active" : true,
+    "error" : null
+  },
+  "activity" : [
+
+  ],
+  "artwork" : {
+    "creatorAvatar" : "ok",
+    "icon" : "ok"
+  },
+  "capabilities" : {
+    "declared" : [
+      "expanded-surface"
+    ],
+    "granted" : [
+      "expanded-surface"
+    ]
+  },
+  "droplet" : {
+    "capabilities" : [
+      "expanded-surface"
+    ],
+    "category" : "Productivity",
+    "creator" : "Dinanath Dash",
+    "icon" : "Brewmanager.icon",
+    "id" : "brewmanager",
+    "kit" : {
+      "abi" : 1,
+      "minAPI" : "1.8.1"
+    },
+    "minAppVersion" : "15.3.0",
+    "name" : "Brew Manager",
+    "summary" : "One line about Brewmanager",
+    "surfaces" : [
+      "shelf-widget",
+      "expanded-surface",
+      "settings-pane"
+    ],
+    "typeID" : "brewmanager",
+    "version" : "1.0.1"
+  },
+  "expandedSurfaces" : [
+    {
+      "id" : "brewmanager-detail",
+      "systemImage" : "cup.and.saucer.fill",
+      "title" : "Brew Manager"
+    }
+  ],
+  "harness" : {
+    "abi" : 1,
+    "apiVersion" : "1.8.1"
+  },
+  "liveActivity" : {
+    "publishing" : false,
+    "seat" : "none(idle)"
+  },
+  "lockScreen" : {
+    "publishing" : false
+  },
+  "log" : [
+    {
+      "at" : "2026-09-18T13:41:21Z",
+      "level" : "info",
+      "message" : "Brewmanager activated"
+    },
+    {
+      "at" : "2026-09-18T13:41:21Z",
+      "level" : "error",
+      "message" : "BrewState refresh failed: Error: $HOME must be set to run brew.\n"
+    }
+  ],
+  "manifest" : {
+    "loaded" : true,
+    "path" : "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/droplet.json",
+    "problem" : null
+  },
+  "problems" : [
+
+  ],
+  "schema" : "droppykit-harness-report\/1",
+  "shelfWidgets" : [
+    {
+      "contentHeight" : "fixed(150.0)",
+      "id" : "brewmanager",
+      "preferredPairedWidth" : 210,
+      "preferredSoloWidth" : 420,
+      "systemImage" : "cup.and.saucer.fill",
+      "title" : "Brew Manager"
+    }
+  ],
+  "shots" : [
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/overview.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/shelf-widget.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/live-activity.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/hud.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/expanded-surface.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/settings-pane.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/lock-screen.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/menu-bar.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/capabilities.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/preferences.png",
+    "\/Users\/dinanathdash\/Documents\/Projects\/brewmanager\/shots\/activity.png"
+  ],
+  "surfaces" : [
+    {
+      "declared" : true,
+      "implemented" : true,
+      "surface" : "shelf-widget",
+      "verdict" : "provided"
+    },
+    {
+      "declared" : false,
+      "implemented" : false,
+      "surface" : "live-activity",
+      "verdict" : "not-provided"
+    },
+    {
+      "declared" : true,
+      "implemented" : true,
+      "surface" : "expanded-surface",
+      "verdict" : "provided"
+    },
+    {
+      "declared" : true,
+      "implemented" : true,
+      "surface" : "settings-pane",
+      "verdict" : "provided"
+    },
+    {
+      "declared" : false,
+      "implemented" : false,
+      "surface" : "hud",
+      "verdict" : "not-provided"
+    },
+    {
+      "declared" : false,
+      "implemented" : false,
+      "surface" : "lock-screen-status",
+      "verdict" : "not-provided"
+    },
+    {
+      "declared" : false,
+      "implemented" : false,
+      "surface" : "menu-bar-extra",
+      "verdict" : "not-provided"
+    }
+  ],
+  "verdict" : "ok"
+}

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "droppykit": {
+      "command": "/Users/dinanathdash/Documents/Projects/droppykit/Scripts/droppykit",
+      "args": [
+        "mcp",
+        "--package",
+        "/Users/dinanathdash/Documents/Projects/brewmanager/brewmanager"
+      ]
+    }
+  }
+}
