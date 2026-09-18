@@ -13,6 +13,7 @@ struct ShelfWidgetView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 12, height: 12)
+                    .padding(.leading, 2)
                 Text("Brew Manager")
                     .font(.system(size: 12, weight: .semibold))
                 
@@ -51,9 +52,9 @@ struct ShelfWidgetView: View {
                         .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
                 }
             } else {
-                HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: DroppySpacing.md) {
                     VStack(alignment: .leading, spacing: DroppySpacing.xsm) {
-                        if let error = state.errorMessage {
+                        if state.errorMessage != nil {
                             Text("Error loading data")
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.red)
@@ -72,13 +73,14 @@ struct ShelfWidgetView: View {
                             .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
                     }
                     
-                    Spacer()
-                    
                     if state.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.8)
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Spacer()
+                        }
                     } else {
-                        VStack(alignment: .trailing, spacing: DroppySpacing.xsm) {
+                        HStack(spacing: DroppySpacing.sm) {
                             Button("Update Brew") {
                                 Task { await state.updateBrew() }
                             }
@@ -92,14 +94,15 @@ struct ShelfWidgetView: View {
                             }
                             
                             Button("View Details") {
-                                _ = droplet.host?.notchSurface.presentExpandedSurface(
-                                    ExpandedSurfacePresentationRequest(surfaceID: "brewmanager-detail", opensShelf: true)
-                                )
+                                if let host = droplet.host {
+                                    host.workspace.openSettings()
+                                }
                             }
                             .buttonStyle(DroppyQuietButtonStyle(size: .small))
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             
             Spacer(minLength: 0)

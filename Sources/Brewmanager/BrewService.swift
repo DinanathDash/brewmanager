@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import DroppyKit
 
-public struct OutdatedPackage: Codable, Identifiable, Hashable, Sendable {
+public struct OutdatedPackage: Decodable, Identifiable, Hashable, Sendable {
     public var id: String { name }
     public let name: String
     public let installedVersions: [String]
@@ -10,28 +10,66 @@ public struct OutdatedPackage: Codable, Identifiable, Hashable, Sendable {
     
     enum CodingKeys: String, CodingKey {
         case name
+        case token
         case installedVersions = "installed_versions"
         case currentVersion = "current_version"
     }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let token = try? container.decode(String.self, forKey: .token) {
+            self.name = token
+        } else if let str = try? container.decode(String.self, forKey: .name) {
+            self.name = str
+        } else if let arr = try? container.decode([String].self, forKey: .name), let first = arr.first {
+            self.name = first
+        } else {
+            self.name = "Unknown"
+        }
+        self.installedVersions = (try? container.decode([String].self, forKey: .installedVersions)) ?? []
+        self.currentVersion = (try? container.decode(String.self, forKey: .currentVersion)) ?? "Unknown"
+    }
 }
 
-public struct OutdatedResponse: Codable, Sendable {
+public struct OutdatedResponse: Decodable, Sendable {
     public let formulae: [OutdatedPackage]
     public let casks: [OutdatedPackage]
 }
 
-public struct InstalledPackageVersion: Codable, Hashable, Sendable {
+public struct InstalledPackageVersion: Decodable, Hashable, Sendable {
     public let version: String
 }
 
-public struct InstalledPackage: Codable, Identifiable, Hashable, Sendable {
+public struct InstalledPackage: Decodable, Identifiable, Hashable, Sendable {
     public var id: String { name }
     public let name: String
     public let installed: [InstalledPackageVersion]?
     public let version: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case name
+        case token
+        case installed
+        case version
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let token = try? container.decode(String.self, forKey: .token) {
+            self.name = token
+        } else if let str = try? container.decode(String.self, forKey: .name) {
+            self.name = str
+        } else if let arr = try? container.decode([String].self, forKey: .name), let first = arr.first {
+            self.name = first
+        } else {
+            self.name = "Unknown"
+        }
+        self.installed = try? container.decodeIfPresent([InstalledPackageVersion].self, forKey: .installed)
+        self.version = try? container.decodeIfPresent(String.self, forKey: .version)
+    }
 }
 
-public struct InstalledResponse: Codable, Sendable {
+public struct InstalledResponse: Decodable, Sendable {
     public let formulae: [InstalledPackage]
     public let casks: [InstalledPackage]
 }
@@ -99,26 +137,44 @@ public final class BrewService {
             process.arguments = arguments
             
             // Required so brew can find system tools if PATH isn't set nicely in Droppy
-            process.environment = [
-                "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-                "HOMEBREW_NO_AUTO_UPDATE": "1"
-            ]
+            var env = ProcessInfo.processInfo.environment
+            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+            process.environment = env
             
             let pipe = Pipe()
             process.standardOutput = pipe
             process.standardError = pipe
             
-            try process.run()
-            process.waitUntilExit()
-            
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            
-            if process.terminationStatus != 0 {
-                throw NSError(domain: "BrewService", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: output])
+            do {
+                try process.run()
+                let data = try pipe.fileHandleForReading.readToEnd() ?? Data()
+                process.waitUntilExit()
+                
+                let output = String(data: data, encoding: .utf8) ?? ""
+                
+                if process.terminationStatus != 0 {
+                    throw NSError(domain: "BrewService", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: output])
+                }
+                
+                return output
+            } catch {
+                let nsError = error as NSError
+                if nsError.domain == NSCocoaErrorDomain && nsError.code == 260 {
+                    // Sandbox fallback via AppleScript
+                    let commandStr = "PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin HOMEBREW_NO_AUTO_UPDATE=1 \(executable) \(arguments.joined(separator: " "))"
+                    let appleScriptStr = "do shell script \"\(commandStr)\""
+                    if let script = NSAppleScript(source: appleScriptStr) {
+                        var scriptError: NSDictionary?
+                        let result = script.executeAndReturnError(&scriptError)
+                        if let err = scriptError {
+                            throw NSError(domain: "BrewService", code: 1, userInfo: [NSLocalizedDescriptionKey: "\(err)"])
+                        }
+                        return result.stringValue ?? ""
+                    }
+                }
+                throw error
             }
-            
-            return output
         }.value
     }
 }

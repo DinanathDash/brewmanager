@@ -10,6 +10,8 @@ public final class BrewState: ObservableObject {
     @Published public var installedPackages: [InstalledPackage] = []
     
     @Published public var isLoading: Bool = false
+    @Published public var isUpdatingAll: Bool = false
+    @Published public var updatingPackageNames: Set<String> = []
     @Published public var errorMessage: String? = nil
     
     private let service = BrewService()
@@ -63,35 +65,68 @@ public final class BrewState: ObservableObject {
     }
     
     public func upgradeAll() async {
-        isLoading = true
+        isUpdatingAll = true
         do {
             try await service.upgradeAll(executable: executablePath)
             await refresh()
+            _ = host?.hud.present(DropletHUDRequest(
+                id: "brewmanager-hud",
+                accessibilityLabel: "Updated all packages",
+                isExpanded: true,
+                content: {
+                    Image.brewIcon.resizable().scaledToFit().frame(width: 16, height: 16)
+                },
+                expanded: {
+                    BrewHUDView(message: "Updated all packages")
+                }
+            ))
         } catch {
             self.errorMessage = "Upgrade failed: \(error.localizedDescription)"
         }
-        isLoading = false
+        isUpdatingAll = false
     }
     
     public func upgrade(package: OutdatedPackage) async {
-        isLoading = true
+        updatingPackageNames.insert(package.name)
         do {
             try await service.upgradePackage(executable: executablePath, name: package.name)
             await refresh()
+            _ = host?.hud.present(DropletHUDRequest(
+                id: "brewmanager-hud",
+                accessibilityLabel: "Updated \(package.name)",
+                isExpanded: true,
+                content: {
+                    Image.brewIcon.resizable().scaledToFit().frame(width: 16, height: 16)
+                },
+                expanded: {
+                    BrewHUDView(message: "Updated \(package.name)")
+                }
+            ))
         } catch {
             self.errorMessage = "Upgrade failed for \(package.name): \(error.localizedDescription)"
         }
-        isLoading = false
+        updatingPackageNames.remove(package.name)
     }
     
     public func uninstall(package: InstalledPackage) async {
-        isLoading = true
+        updatingPackageNames.insert(package.name)
         do {
             try await service.uninstallPackage(executable: executablePath, name: package.name)
             await refresh()
+            _ = host?.hud.present(DropletHUDRequest(
+                id: "brewmanager-hud",
+                accessibilityLabel: "Deleted \(package.name)",
+                isExpanded: true,
+                content: {
+                    Image.brewIcon.resizable().scaledToFit().frame(width: 16, height: 16)
+                },
+                expanded: {
+                    BrewHUDView(message: "Deleted \(package.name)")
+                }
+            ))
         } catch {
             self.errorMessage = "Uninstall failed for \(package.name): \(error.localizedDescription)"
         }
-        isLoading = false
+        updatingPackageNames.remove(package.name)
     }
 }

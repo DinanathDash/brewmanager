@@ -17,7 +17,8 @@ let package = Package(
     targets: [
         .target(
             name: "Brewmanager",
-            dependencies: [.product(name: "DroppyKit", package: "droppykit")]
+            dependencies: [.product(name: "DroppyKit", package: "droppykit")],
+            exclude: ["Resources"]
         ),
         .executableTarget(
             name: "BrewmanagerHarness",

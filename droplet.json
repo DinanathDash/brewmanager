@@ -11,12 +11,15 @@
   },
   "minAppVersion": "15.3.0",
   "capabilities": [
-    "expanded-surface"
+    "expanded-surface",
+    "apple-events",
+    "hud"
   ],
   "surfaces": [
     "shelf-widget",
     "expanded-surface",
-    "settings-pane"
+    "settings-pane",
+    "hud"
   ],
   "icon": "Brewmanager.icon",
   "creator": {

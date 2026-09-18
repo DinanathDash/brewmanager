@@ -68,7 +68,7 @@ extension BrewmanagerDroplet: ExpandedSurfaceProviding {
     public var expandedSurfaces: [ExpandedSurfaceDescriptor] {
         [
             ExpandedSurfaceDescriptor(
-                id: "brewmanager-detail",
+                id: "expanded-surface",
                 title: "Brew Manager",
                 systemImage: "cup.and.saucer.fill",
                 suppresses: [.shelfWidgets, .autoCollapse]
@@ -96,7 +96,7 @@ extension BrewmanagerDroplet: ExpandedSurfaceProviding {
 
 extension BrewmanagerDroplet: SettingsPaneProviding {
     public func makeSettingsPane(context: SettingsPaneContext) -> AnyView {
-        AnyView(SettingsPaneView(droplet: self, context: context))
+        AnyView(SettingsPaneView(droplet: self, state: state, context: context))
     }
     
     public var settingsSearchEntries: [SettingsSearchEntry] {
@@ -105,4 +105,8 @@ extension BrewmanagerDroplet: SettingsPaneProviding {
         ]
     }
 }
+
+// MARK: - HUD
+
+extension BrewmanagerDroplet: HUDPresenting {}
 

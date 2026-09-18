@@ -12,15 +12,18 @@
   },
   "capabilities" : {
     "declared" : [
-      "expanded-surface"
+      "expanded-surface",
+      "apple-events"
     ],
     "granted" : [
+      "apple-events",
       "expanded-surface"
     ]
   },
   "droplet" : {
     "capabilities" : [
-      "expanded-surface"
+      "expanded-surface",
+      "apple-events"
     ],
     "category" : "Productivity",
     "creator" : "Dinanath Dash",
@@ -61,14 +64,9 @@
   },
   "log" : [
     {
-      "at" : "2026-09-18T13:41:21Z",
+      "at" : "2026-09-18T15:09:50Z",
       "level" : "info",
       "message" : "Brewmanager activated"
-    },
-    {
-      "at" : "2026-09-18T13:41:21Z",
-      "level" : "error",
-      "message" : "BrewState refresh failed: Error: $HOME must be set to run brew.\n"
     }
   ],
   "manifest" : {
