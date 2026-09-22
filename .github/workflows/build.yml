@@ -1,21 +1,61 @@
-name: Build Droplet
+name: Build and Release Droplet
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  build-and-release:
     runs-on: macos-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Release Notes from Changelog
+        id: extract_notes
+        run: |
+          python3 -c "
+          import sys, re
+          with open('CHANGELOG.md', 'r') as f: content = f.read()
+          
+          # Match the first version block
+          match = re.search(r'^##\s+([0-9\.]+)\s+-\s+(.*?)\n(.*?)(?=\n---\n|\n## |\n##\n|$)', content, re.DOTALL | re.MULTILINE)
+          if not match:
+              print('Error: Could not parse latest release from CHANGELOG.md')
+              sys.exit(1)
+              
+          version = match.group(1).strip()
+          title = match.group(2).strip()
+          notes = match.group(3).strip()
+          
+          with open('release_version.txt', 'w') as f: f.write(version)
+          with open('release_title.txt', 'w') as f: f.write(title)
+          with open('release_notes.md', 'w') as f: f.write(notes)
+          "
+          echo "version=$(cat release_version.txt)" >> $GITHUB_ENV
+          echo "title=$(cat release_title.txt)" >> $GITHUB_ENV
+
+      - name: Push Git Tag
+        run: |
+          # Configure Git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if tag already exists to avoid failing the workflow unnecessarily
+          if git ls-remote --tags origin | grep -q "refs/tags/v${{ env.version }}$"; then
+            echo "Tag v${{ env.version }} already exists."
+          else
+            git tag "v${{ env.version }}"
+            git push origin "v${{ env.version }}"
+          fi
 
       - name: Clone DroppyKit CLI
         run: git clone https://gitlab.com/droppyformac1/droppykit.git ../droppykit
@@ -33,3 +73,13 @@ jobs:
         with:
           name: Brewmanager
           path: .build/Brewmanager.zip
+
+      - name: Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.version }}
+          name: v${{ env.version }} - ${{ env.title }}
+          body_path: release_notes.md
+          files: |
+            .build/Brewmanager.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
