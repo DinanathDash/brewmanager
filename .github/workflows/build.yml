@@ -27,7 +27,7 @@ jobs:
           with open('CHANGELOG.md', 'r') as f: content = f.read()
           
           # Match the first version block
-          match = re.search(r'^##\s+([0-9\.]+)\s+-\s+(.*?)\n(.*?)(?=\n---\n|\n## |\n##\n|$)', content, re.DOTALL | re.MULTILINE)
+          match = re.search(r'^##\s+([0-9\.]+)\s+-\s+(.*?)\n(.*?)(?=\n---\n|\n## |\n##\n|\Z)', content, re.DOTALL | re.MULTILINE)
           if not match:
               print('Error: Could not parse latest release from CHANGELOG.md')
               sys.exit(1)
