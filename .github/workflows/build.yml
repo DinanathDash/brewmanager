@@ -1,0 +1,35 @@
+name: Build Droplet
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Clone DroppyKit CLI
+        run: git clone https://gitlab.com/droppyformac1/droppykit.git ../droppykit
+
+      - name: Build Droplet
+        run: ../droppykit/Scripts/droppykit build
+
+      - name: Create ZIP Archive
+        run: |
+          cd .build
+          zip -r Brewmanager.zip Brewmanager.droplet
+
+      - name: Upload Droplet Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Brewmanager
+          path: .build/Brewmanager.zip
