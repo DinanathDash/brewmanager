@@ -23,62 +23,86 @@ jobs:
         id: extract_notes
         run: |
           python3 -c "
-          import sys, re
-          with open('CHANGELOG.md', 'r') as f: content = f.read()
-          
-          # Match the first version block
-          match = re.search(r'^##\s+([0-9\.]+)\s+-\s+(.*?)\n(.*?)(?=\n---\n|\n## |\n##\n|\Z)', content, re.DOTALL | re.MULTILINE)
+          import os, sys, re, json
+
+          with open('CHANGELOG.md', 'r') as f:
+              content = f.read()
+
+          # Match the first version block using regex (supports '## [1.0.1] - 2026-09-24', '## 1.0.1 - Title', or '## [1.0.1]')
+          match = re.search(r'^##\s+\[?([0-9\.]+)\]?(?:[^\S\r\n]*-[^\S\r\n]*(.*?))?\r?\n(.*?)(?=\n---\n|\n## |\n##\n|\Z)', content, re.DOTALL | re.MULTILINE)
           if not match:
               print('Error: Could not parse latest release from CHANGELOG.md')
               sys.exit(1)
-              
+
           version = match.group(1).strip()
-          title = match.group(2).strip()
+          title = (match.group(2) or '').strip()
           notes = match.group(3).strip()
-          
-          with open('release_version.txt', 'w') as f: f.write(version)
-          with open('release_title.txt', 'w') as f: f.write(title)
-          with open('release_notes.md', 'w') as f: f.write(notes)
+
+          # Cross-validate with droplet.json if present
+          if os.path.exists('droplet.json'):
+              with open('droplet.json', 'r') as f:
+                  droplet_data = json.load(f)
+                  manifest_version = droplet_data.get('version', '').strip()
+                  if manifest_version and manifest_version != version:
+                      print(f'Warning: CHANGELOG version ({version}) does not match droplet.json version ({manifest_version})')
+
+          release_name = f'v{version} - {title}' if title else f'v{version}'
+          if not notes:
+              notes = f'Release v{version}'
+
+          with open('release_notes.md', 'w') as f:
+              f.write(notes + '\n')
+
+          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
+              env_file.write(f'version={version}\n')
+              env_file.write(f'title={title}\n')
+              env_file.write(f'release_name={release_name}\n')
           "
-          echo "version=$(cat release_version.txt)" >> $GITHUB_ENV
-          echo "title=$(cat release_title.txt)" >> $GITHUB_ENV
 
       - name: Push Git Tag
         run: |
           # Configure Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           # Check if tag already exists to avoid failing the workflow unnecessarily
           if git ls-remote --tags origin | grep -q "refs/tags/v${{ env.version }}$"; then
-            echo "Tag v${{ env.version }} already exists."
+            echo "Tag v${{ env.version }} already exists on remote."
           else
-            git tag "v${{ env.version }}"
+            echo "Creating and pushing tag v${{ env.version }}..."
+            git tag -f "v${{ env.version }}"
             git push origin "v${{ env.version }}"
           fi
 
-      - name: Clone DroppyKit CLI
-        run: git clone https://gitlab.com/droppyformac1/droppykit.git ../droppykit
+      - name: Setup DroppyKit CLI
+        run: |
+          git clone --depth 1 https://gitlab.com/droppyformac1/droppykit.git ../droppykit
+          chmod +x ../droppykit/Scripts/droppykit
+          echo "$(cd ../droppykit/Scripts && pwd)" >> $GITHUB_PATH
 
       - name: Build Droplet
-        run: ../droppykit/Scripts/droppykit build
+        run: droppykit build
+
+      - name: Validate Droplet
+        run: droppykit validate
 
       - name: Create ZIP Archive
         run: |
           cd .build
-          zip -r Brewmanager.zip Brewmanager.droplet
+          zip -r -y Brewmanager.zip Brewmanager.droplet
 
       - name: Upload Droplet Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Brewmanager
           path: .build/Brewmanager.zip
+          if-no-files-found: error
 
       - name: Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.version }}
-          name: v${{ env.version }} - ${{ env.title }}
+          name: ${{ env.release_name }}
           body_path: release_notes.md
           files: |
             .build/Brewmanager.zip

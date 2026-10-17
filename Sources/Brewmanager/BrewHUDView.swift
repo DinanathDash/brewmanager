@@ -6,10 +6,12 @@ struct BrewHUDView: View {
     
     var body: some View {
         HStack(spacing: DroppySpacing.sm) {
-            Image.brewIcon
+            Image(systemName: "shippingbox.fill")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 20, height: 20)
+            
+            Spacer(minLength: 0)
             
             Text(message)
                 .font(.system(size: 15, weight: .semibold))

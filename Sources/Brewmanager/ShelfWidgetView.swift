@@ -9,7 +9,7 @@ struct ShelfWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DroppySpacing.sm) {
             HStack(spacing: DroppySpacing.xsm) {
-                Image.brewIcon
+                Image(systemName: "shippingbox.fill")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 12, height: 12)
@@ -20,16 +20,6 @@ struct ShelfWidgetView: View {
                 Spacer(minLength: 0)
                 
                 if !context.isCompact {
-                    Button {
-                        if let host = droplet.host {
-                            host.workspace.openSettings()
-                        }
-                    } label: {
-                        Image(systemName: "gear")
-                    }
-                    .buttonStyle(DroppyCircleButtonStyle(size: 20))
-                    .help("Settings")
-                    
                     Button {
                         Task { await state.refresh() }
                     } label: {
@@ -42,35 +32,30 @@ struct ShelfWidgetView: View {
             .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
 
             if context.isCompact {
-                if state.outdatedPackages.isEmpty {
+                if state.errorMessage != nil {
+                    Text("Refresh failed")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
+                } else if state.outdatedPackages.isEmpty {
                     Text("All brews are updated")
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
                 } else {
-                    Text("\(state.outdatedPackages.count) Updates")
+                    Text("\(state.outdatedPackages.count) updates")
                         .font(.system(size: 20, weight: .semibold, design: .rounded))
                         .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
                 }
             } else {
-                VStack(alignment: .leading, spacing: DroppySpacing.md) {
+                HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: DroppySpacing.xsm) {
                         if state.errorMessage != nil {
                             Text("Error loading data")
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.red)
+                                .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
                         } else if state.outdatedPackages.isEmpty {
-                            HStack {
-                                Text("All brews are updated")
-                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
-                                Spacer()
-                                if !state.isLoading && !state.isUpdatingBrew {
-                                    Button("Update Brew") {
-                                        Task { await state.updateBrew() }
-                                    }
-                                    .buttonStyle(DroppyQuietButtonStyle(size: .small))
-                                }
-                            }
+                            Text("All brews are updated")
+                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
                         } else {
                             Text("\(state.outdatedPackages.count) updates available")
                                 .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -82,32 +67,18 @@ struct ShelfWidgetView: View {
                             .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
                     }
                     
+                    Spacer()
+                    
                     if state.isLoading || state.isUpdatingBrew {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Spacer()
+                        ProgressView().scaleEffect(0.8)
+                    } else {
+                        Button("View details") {
+                            state.showUpdatesOnly = true
+                            if let host = droplet.host {
+                                host.workspace.openSettings()
+                            }
                         }
-                    } else if !state.outdatedPackages.isEmpty {
-                        HStack(spacing: DroppySpacing.sm) {
-                            Button("Update Brew") {
-                                Task { await state.updateBrew() }
-                            }
-                            .buttonStyle(DroppyQuietButtonStyle(size: .small))
-                            
-                            Button("Update All") {
-                                Task { await state.upgradeAll() }
-                            }
-                            .buttonStyle(DroppyAccentButtonStyle(size: .small))
-                            
-                            Button("View Details") {
-                                state.showUpdatesOnly = true
-                                if let host = droplet.host {
-                                    host.workspace.openSettings()
-                                }
-                            }
-                            .buttonStyle(DroppyQuietButtonStyle(size: .small))
-                        }
+                        .buttonStyle(DroppyQuietButtonStyle(size: .small))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -115,8 +86,7 @@ struct ShelfWidgetView: View {
             
             Spacer(minLength: 0)
         }
-        .padding(.top, 6)
         .padding(context.contentInsets)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

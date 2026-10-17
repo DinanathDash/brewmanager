@@ -6,7 +6,6 @@ struct SettingsPaneView: View {
     @ObservedObject var state: BrewState
     let context: SettingsPaneContext
     
-    @State private var packageToDelete: InstalledPackage?
     @State private var searchText = ""
     @State private var selectedTab = 0 // 0: Installed, 1: Discover
     @State private var discoverSearchText = ""
@@ -15,12 +14,14 @@ struct SettingsPaneView: View {
         var pkgs = state.installedPackages
         if state.showUpdatesOnly {
             pkgs = pkgs.filter { pkg in
-                state.outdatedPackages.contains(where: { $0.name == pkg.name })
+                state.outdatedPackages.contains(where: { $0.id == pkg.id })
             }
         }
         if !searchText.isEmpty {
             pkgs = pkgs.filter { pkg in
-                pkg.name.localizedCaseInsensitiveContains(searchText)
+                let matchesName = pkg.name.localizedCaseInsensitiveContains(searchText)
+                let matchesDesc = pkg.desc?.localizedCaseInsensitiveContains(searchText) ?? false
+                return matchesName || matchesDesc
             }
         }
         return pkgs
@@ -34,357 +35,272 @@ struct SettingsPaneView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DroppySpacing.lg) {
-                
-                VStack(alignment: .leading, spacing: DroppySpacing.sm) {
-                    Text("Configuration")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                        .padding(.leading, DroppySpacing.sm)
+        DropletSettingsPane {
+            DropletSettingsSection(header: { Text("Configuration") }) {
+                DropletSettingsCard {
+                    DropletControlRow(title: "Homebrew executable") {
+                        TextField("", text: brewExecutablePathBinding, prompt: Text("Path"))
+                            .labelsHidden()
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 250)
+                    }
                     
-                    DropletSettingsCard {
-                        DropletControlRow(title: "Homebrew Executable") {
-                            TextField("Path", text: brewExecutablePathBinding)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 250)
-                        }
-                        
-                        DropletSettingsDivider()
-                        
-                        DropletControlRow(title: "Check for Updates") {
-                            HStack(spacing: DroppySpacing.sm) {
-                                Button(state.isUpdatingBrew ? "Updating..." : (state.isUpdateSuccess ? "Updated!" : "Update Homebrew")) {
-                                    Task { await state.updateBrew() }
-                                }
-                                .buttonStyle(DroppyQuietButtonStyle(size: .small))
-                                .disabled(state.isLoading || state.isUpdatingBrew || state.isUpdateSuccess)
-                                
-                                Button(state.isLoading ? "Refreshing..." : (state.isRefreshSuccess ? "Refreshed!" : "Refresh Data Now")) {
-                                    Task { await state.refresh() }
-                                }
-                                .buttonStyle(DroppyQuietButtonStyle(size: .small))
-                                .disabled(state.isLoading || state.isUpdatingBrew || state.isRefreshSuccess)
+                    DropletControlRow(title: "Check for updates") {
+                        HStack(spacing: DroppySpacing.sm) {
+                            Button(state.isUpdatingBrew ? "Updating..." : (state.isUpdateSuccess ? "Updated" : "Update Homebrew")) {
+                                Task { await state.updateBrew() }
                             }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                            .disabled(state.isLoading || state.isUpdatingBrew || state.isUpdateSuccess)
+                            
+                            Button(state.isLoading ? "Refreshing..." : (state.isRefreshSuccess ? "Refreshed" : "Refresh data now")) {
+                                Task { await state.refresh() }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                            .disabled(state.isLoading || state.isUpdatingBrew || state.isRefreshSuccess)
                         }
+                    }
+                    
+                    DropletControlRow(title: "Version") {
+                        Text(state.version)
+                            .foregroundStyle(.secondary)
                     }
                 }
+            }
                 
-                VStack(alignment: .leading, spacing: DroppySpacing.sm) {
-                    HStack {
-                        Text("Packages")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                        
-                        Spacer()
-                        
-                        HStack(spacing: 2) {
-                            Button(action: { selectedTab = 0 }) {
-                                Text("Installed")
-                                    .font(.system(size: 12, weight: selectedTab == 0 ? .semibold : .regular))
-                                    .foregroundStyle(selectedTab == 0 ? AdaptiveColors.notchSurfacePrimaryText : AdaptiveColors.notchSurfaceSecondaryText)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
-                                    .background(selectedTab == 0 ? Color.white.opacity(0.12) : Color.clear)
-                                    .cornerRadius(6)
-                            }
-                            .buttonStyle(.plain)
-                            
-                            Button(action: { selectedTab = 1 }) {
-                                Text("Discover")
-                                    .font(.system(size: 12, weight: selectedTab == 1 ? .semibold : .regular))
-                                    .foregroundStyle(selectedTab == 1 ? AdaptiveColors.notchSurfacePrimaryText : AdaptiveColors.notchSurfaceSecondaryText)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
-                                    .background(selectedTab == 1 ? Color.white.opacity(0.12) : Color.clear)
-                                    .cornerRadius(6)
-                            }
-                            .buttonStyle(.plain)
+            DropletSettingsSection(header: { Text("Packages") }) {
+                DropletSettingsCard {
+                    DropletControlRow(title: "Mode") {
+                        Picker("Mode", selection: $selectedTab) {
+                            Text("Installed").tag(0)
+                            Text("Discover").tag(1)
                         }
-                        .padding(2)
-                        .background(Color.white.opacity(0.04))
-                        .cornerRadius(8)
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
                     }
-                    .padding(.leading, DroppySpacing.sm)
-                    
-                    if selectedTab == 0 {
-                        if state.isLoading && state.installedPackages.isEmpty {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
-                        }
-                        .padding()
-                    } else if state.installedPackages.isEmpty {
-                        DropletSettingsCard {
-                            HStack {
-                                Text(state.errorMessage ?? "No packages found.")
-                                    .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                                    .font(.system(size: 11))
-                                Spacer()
-                            }
-                            .padding(DroppySpacing.sm)
-                        }
-                    } else {
-                        DropletSettingsCard {
-                            HStack {
-                                HStack {
-                                    Image(systemName: "magnifyingglass")
-                                        .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                                    TextField("Search...", text: $searchText)
-                                        .textFieldStyle(.plain)
-                                }
-                                .padding(6)
-                                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-                                .cornerRadius(16)
-                                .frame(width: 160)
-                                
-                                Spacer()
-                                
-                                if !state.outdatedPackages.isEmpty {
-                                    Button {
-                                        Task { await state.upgradeAll() }
-                                    } label: {
-                                        if state.isUpdatingAll {
-                                            HStack {
-                                                Text("Updating All...")
-                                                ProgressView().scaleEffect(0.5)
-                                            }
-                                        } else {
-                                            Text("Update All")
+                }
+
+                if selectedTab == 0 {
+                    DropletSettingsCard {
+                        DropletToggleRow(
+                            title: "Show only updates",
+                            isOn: $state.showUpdatesOnly
+                        )
+                        
+                        if !state.outdatedPackages.isEmpty {
+                            DropletControlRow(title: "Update all") {
+                                Button {
+                                    Task { await state.upgradeAll() }
+                                } label: {
+                                    if state.isUpdatingAll {
+                                        HStack {
+                                            Text("Updating all...")
+                                            ProgressView().controlSize(.small)
                                         }
-                                    }
-                                    .buttonStyle(DroppyAccentButtonStyle(size: .small))
-                                    .disabled(state.isUpdatingAll)
-                                }
-                                
-                                Button(state.showUpdatesOnly ? "Show All" : "Updates Available") {
-                                    state.showUpdatesOnly.toggle()
-                                }
-                                .buttonStyle(DroppyQuietButtonStyle(size: .small))
-                            }
-                            .padding(DroppySpacing.sm)
-                            
-                            DropletSettingsDivider()
-                            
-                            ScrollView(showsIndicators: false) {
-                                VStack(spacing: 0) {
-                                    let pkgs = filteredPackages
-                                    if pkgs.isEmpty {
-                                        VStack(spacing: DroppySpacing.md) {
-                                            Spacer()
-                                            Image.brewIcon
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 32, height: 32)
-                                                .opacity(0.6)
-                                            Text(state.showUpdatesOnly ? "No updates available." : "No packages match your search.")
-                                                .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                                                .font(.system(size: 13, weight: .medium))
-                                            Spacer()
-                                        }
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                        .padding(.vertical, 40)
                                     } else {
-                                        ForEach(Array(pkgs.enumerated()), id: \.element.id) { index, pkg in
-                                            HStack {
-                                                VStack(alignment: .leading) {
-                                                    HStack(spacing: 6) {
-                                                        Text(pkg.name)
-                                                            .font(.system(size: 14, weight: .medium))
-                                                            .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
-                                                        Text(pkg.isCask ? "Cask" : "Formula")
-                                                            .font(.system(size: 10, weight: .medium))
-                                                            .padding(.horizontal, 6)
-                                                            .padding(.vertical, 2)
-                                                            .background(pkg.isCask ? Color.purple.opacity(0.2) : Color.blue.opacity(0.2))
-                                                            .foregroundStyle(pkg.isCask ? Color.purple : Color.blue)
-                                                            .cornerRadius(4)
-                                                    }
-                                                    if let v = pkg.installed?.first?.version ?? pkg.version {
-                                                        Text(v)
-                                                            .font(.system(size: 12))
-                                                            .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                                                    }
-                                                    if let desc = pkg.desc {
-                                                        Text(desc)
-                                                            .font(.system(size: 11))
-                                                            .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText.opacity(0.8))
-                                                            .lineLimit(1)
-                                                    }
-                                                }
-                                                Spacer()
-                                                
-                                                if state.updatingPackageNames.contains(pkg.name) {
-                                                    ProgressView()
-                                                        .scaleEffect(0.8)
-                                                        .padding(.trailing, DroppySpacing.sm)
-                                                } else {
-                                                    if let outdated = state.outdatedPackages.first(where: { $0.name == pkg.name }) {
-                                                        Button {
-                                                            Task { await state.upgrade(package: outdated) }
-                                                        } label: {
-                                                            Image(systemName: "arrow.triangle.2.circlepath")
-                                                                .font(.system(size: 12, weight: .medium))
-                                                                .frame(width: 24, height: 24)
-                                                                .background(Color.blue.opacity(0.2))
-                                                                .foregroundStyle(Color.blue)
-                                                                .clipShape(Circle())
-                                                        }
-                                                        .buttonStyle(.plain)
-                                                        .help("Update")
-                                                        .disabled(state.isUpdatingAll)
-                                                    }
-                                                    
-                                                    Button {
-                                                        packageToDelete = pkg
-                                                    } label: {
-                                                        Image(systemName: "trash")
-                                                            .font(.system(size: 12, weight: .medium))
-                                                            .frame(width: 24, height: 24)
-                                                            .background(Color.red.opacity(0.2))
-                                                            .foregroundStyle(Color.red)
-                                                            .clipShape(Circle())
-                                                    }
-                                                    .buttonStyle(.plain)
-                                                    .help("Delete")
-                                                    .disabled(state.isUpdatingAll)
-                                                }
-                                            }
-                                            .padding(DroppySpacing.sm)
-                                            
-                                            if index < pkgs.count - 1 {
-                                                DropletSettingsDivider()
-                                            }
-                                        }
+                                        Text("Update all")
                                     }
                                 }
+                                .buttonStyle(.bordered)
+                                .controlSize(.regular)
+                                .disabled(state.isUpdatingAll)
                             }
-                            .frame(height: 300)
                         }
-                        .droppyFlatGlassControls()
-                    } // closes else block
-                    } else { // closes if selectedTab == 0
-                        // Discover Tab
-                        DropletSettingsCard {
+                        
+                        SearchField(text: $searchText, placeholder: "Search...")
+                            .padding(.vertical, 4)
+                    }
+                    
+                    DropletSettingsCard {
+                        if state.isLoading && state.installedPackages.isEmpty {
                             HStack {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "magnifyingglass")
-                                        .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                                    TextField("Search Homebrew...", text: $discoverSearchText)
-                                        .textFieldStyle(.plain)
-                                        .onSubmit {
-                                            Task { await state.search(query: discoverSearchText) }
-                                        }
-                                }
-                                .padding(6)
-                                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-                                .cornerRadius(16)
-                                
                                 Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                        } else if state.installedPackages.isEmpty {
+                            Text(state.errorMessage ?? "No packages found.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            let pkgs = filteredPackages
+                            if pkgs.isEmpty {
+                                Text(state.showUpdatesOnly ? "No updates available." : "No packages match your search.")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(pkgs) { pkg in
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            HStack {
+                                                Text(pkg.name)
+                                                    .font(.system(size: 14, weight: .medium))
+                                                Text(pkg.isCask ? "Cask" : "Formula")
+                                                    .font(.system(size: 10, weight: .medium))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            if let v = pkg.installed?.first?.version ?? pkg.version {
+                                                Text(v)
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            if let desc = pkg.desc {
+                                                Text(desc)
+                                                    .font(.system(size: 11))
+                                                    .foregroundStyle(.secondary.opacity(0.8))
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        Spacer()
+                                        
+                                        if state.updatingPackageNames.contains(pkg.id) {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                        } else {
+                                            if let outdated = state.outdatedPackages.first(where: { $0.id == pkg.id }) {
+                                                Button {
+                                                    Task { await state.upgrade(package: outdated) }
+                                                } label: {
+                                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                                }
+                                                .buttonStyle(.borderless)
+                                                .help("Update")
+                                                .disabled(state.isUpdatingAll)
+                                            }
+                                            
+                                            Button {
+                                                if DropletConfirmationDialog.present(title: "Delete \(pkg.name)?", message: "This will run brew uninstall and cannot be undone.", confirmTitle: "Delete", symbol: "trash") {
+                                                    Task { await state.uninstall(package: pkg) }
+                                                }
+                                            } label: {
+                                                Image(systemName: "trash")
+                                            }
+                                            .buttonStyle(.borderless)
+                                            .help("Delete")
+                                            .disabled(state.isUpdatingAll)
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Discover Tab
+                    DropletSettingsCard {
+                        HStack {
+                            SearchField(text: $discoverSearchText, placeholder: "Search Homebrew...", sendsWholeSearchString: true) {
+                                Task { await state.search(query: discoverSearchText) }
+                            }
                                 
                                 Button(state.isSearching ? "Searching..." : "Search") {
                                     Task { await state.search(query: discoverSearchText) }
                                 }
-                                .buttonStyle(DroppyAccentButtonStyle(size: .small))
+                                .buttonStyle(.bordered)
+                                .controlSize(.regular)
                                 .disabled(state.isSearching || discoverSearchText.isEmpty)
                             }
-                            .padding(DroppySpacing.sm)
-                            
-                            DropletSettingsDivider()
-                            
-                            ScrollView(showsIndicators: false) {
-                                VStack(spacing: 0) {
-                                    let pkgs = state.searchResults
-                                    if pkgs.isEmpty {
-                                        VStack(spacing: DroppySpacing.md) {
-                                            Spacer()
-                                            Image.brewIcon
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 32, height: 32)
-                                                .opacity(0.6)
-                                            Text(discoverSearchText.isEmpty ? "Search for a package to install." : "No packages found.")
-                                                .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                                                .font(.system(size: 13, weight: .medium))
-                                            Spacer()
+                        }
+                    
+
+                    DropletSettingsCard {
+                        let pkgs = state.searchResults
+                        if pkgs.isEmpty {
+                            Text(discoverSearchText.isEmpty ? "Search for a package to install." : "No packages found.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(pkgs) { pkg in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack {
+                                            Text(pkg.name)
+                                                .font(.system(size: 14, weight: .medium))
+                                            Text(pkg.isCask ? "Cask" : "Formula")
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundStyle(.secondary)
                                         }
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                        .padding(.vertical, 40)
-                                    } else {
-                                        ForEach(Array(pkgs.enumerated()), id: \.element.id) { index, pkg in
-                                            HStack {
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    HStack(spacing: 6) {
-                                                        Text(pkg.name)
-                                                            .font(.system(size: 14, weight: .medium))
-                                                            .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
-                                                        Text(pkg.isCask ? "Cask" : "Formula")
-                                                            .font(.system(size: 10, weight: .medium))
-                                                            .padding(.horizontal, 6)
-                                                            .padding(.vertical, 2)
-                                                            .background(pkg.isCask ? Color.purple.opacity(0.2) : Color.blue.opacity(0.2))
-                                                            .foregroundStyle(pkg.isCask ? Color.purple : Color.blue)
-                                                            .cornerRadius(4)
-                                                    }
-                                                    
-                                                    if let desc = pkg.description {
-                                                        Text(desc)
-                                                            .font(.system(size: 11))
-                                                            .foregroundStyle(AdaptiveColors.notchSurfaceSecondaryText)
-                                                            .lineLimit(1)
-                                                    }
-                                                }
-                                                Spacer(minLength: 16)
-                                                
-                                                if state.installedPackages.contains(where: { $0.name == pkg.name }) {
-                                                    Text("Installed")
-                                                        .font(.system(size: 12, weight: .medium))
-                                                        .foregroundStyle(Color.green.opacity(0.8))
-                                                        .padding(.trailing, DroppySpacing.sm)
-                                                } else if state.installingPackages.contains(pkg.name) {
-                                                    ProgressView()
-                                                        .scaleEffect(0.8)
-                                                        .padding(.trailing, DroppySpacing.sm)
-                                                } else {
-                                                    Button("Install") {
-                                                        Task { await state.install(package: pkg) }
-                                                    }
-                                                    .buttonStyle(DroppyQuietButtonStyle(size: .small))
-                                                }
-                                            }
-                                            .padding(DroppySpacing.sm)
-                                            
-                                            if index < pkgs.count - 1 {
-                                                DropletSettingsDivider()
-                                            }
+                                        if let desc = pkg.description {
+                                            Text(desc)
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
                                         }
                                     }
+                                    Spacer(minLength: 16)
+                                    
+                                    if state.installedPackages.contains(where: { $0.id == pkg.id }) {
+                                        Text("Installed")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(Color.green.opacity(0.8))
+                                    } else if state.installingPackages.contains(pkg.id) {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else {
+                                        Button("Install") {
+                                            Task { await state.install(package: pkg) }
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
+                                    }
                                 }
+                                .padding(.vertical, 4)
                             }
-                            .frame(height: 300)
                         }
-                        .droppyFlatGlassControls()
                     }
                 }
             }
-            .confirmationDialog(
-                "Delete \(packageToDelete?.name ?? "this package")?",
-                isPresented: Binding(
-                    get: { packageToDelete != nil },
-                    set: { if !$0 { packageToDelete = nil } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) {
-                    if let pkg = packageToDelete {
-                        Task { await state.uninstall(package: pkg) }
-                    }
-                }
-                Button("Cancel", role: .cancel) {
-                    packageToDelete = nil
-                }
-            } message: {
-                Text("This will run brew uninstall and cannot be undone.")
+        }
+    }
+}
+
+struct SearchField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var sendsWholeSearchString: Bool = false
+    var onSubmit: (() -> Void)? = nil
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let searchField = NSSearchField()
+        searchField.placeholderString = placeholder
+        searchField.delegate = context.coordinator
+        searchField.target = context.coordinator
+        searchField.action = #selector(Coordinator.onSubmitAction(_:))
+        searchField.sendsWholeSearchString = sendsWholeSearchString
+        if sendsWholeSearchString {
+            searchField.sendsSearchStringImmediately = false
+        }
+        return searchField
+    }
+
+    func updateNSView(_ nsView: NSSearchField, context: Context) {
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onSubmit: onSubmit)
+    }
+
+    @MainActor
+    class Coordinator: NSObject, NSSearchFieldDelegate {
+        @Binding var text: String
+        var onSubmit: (() -> Void)?
+
+        init(text: Binding<String>, onSubmit: (() -> Void)?) {
+            _text = text
+            self.onSubmit = onSubmit
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            if let searchField = obj.object as? NSSearchField {
+                text = searchField.stringValue
             }
+        }
+        
+        @objc func onSubmitAction(_ sender: NSSearchField) {
+            text = sender.stringValue
+            onSubmit?()
+        }
     }
 }

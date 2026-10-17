@@ -33,6 +33,7 @@ public final class BrewmanagerDroplet: NSObject, ObservableObject, Droplet {
     }
 
     public func deactivate() {
+        state.detach()
         host = nil
     }
 }
@@ -45,11 +46,10 @@ extension BrewmanagerDroplet: ShelfWidgetProviding {
             ShelfWidgetDescriptor(
                 id: "brewmanager",
                 title: "Brew Manager",
-                systemImage: "cup.and.saucer.fill",
+                systemImage: "shippingbox.fill",
                 layoutTraits: ShelfWidgetLayoutTraits(
                     preferredSoloWidth: 420,
-                    preferredPairedWidth: 210,
-                    contentHeight: .fixed(150)
+                    preferredPairedWidth: 210
                 )
             )
         ]
@@ -62,35 +62,6 @@ extension BrewmanagerDroplet: ShelfWidgetProviding {
     public func makeWidgetSettingsPopover(_ id: ShelfWidgetID) -> AnyView? { nil }
 }
 
-// MARK: - Expanded Surface
-
-extension BrewmanagerDroplet: ExpandedSurfaceProviding {
-    public var expandedSurfaces: [ExpandedSurfaceDescriptor] {
-        [
-            ExpandedSurfaceDescriptor(
-                id: "expanded-surface",
-                title: "Brew Manager",
-                systemImage: "cup.and.saucer.fill",
-                suppresses: [.shelfWidgets, .autoCollapse]
-            )
-        ]
-    }
-    
-    public func expandedSurfaceSize(_ id: ExpandedSurfaceID, fitting proposal: ExpandedSurfaceSizeProposal) -> CGSize? {
-        // We'll take a large size for the list, capped at the maximum allowed
-        let height = min(600.0, proposal.maximumSize.height)
-        let width = min(500.0, proposal.maximumSize.width)
-        return CGSize(width: width, height: height)
-    }
-    
-    public func makeExpandedSurfaceView(_ id: ExpandedSurfaceID, context: ExpandedSurfaceContext) -> AnyView {
-        AnyView(ExpandedSurfaceView(droplet: self, state: state, context: context))
-    }
-    
-    public func expandedSurfaceDidDismiss(_ id: ExpandedSurfaceID, presentation: ExpandedSurfacePresentation, reason: ExpandedSurfaceDismissalReason) {
-        // Optional handle dismiss
-    }
-}
 
 // MARK: - Settings Pane
 
@@ -101,7 +72,7 @@ extension BrewmanagerDroplet: SettingsPaneProviding {
     
     public var settingsSearchEntries: [SettingsSearchEntry] {
         [
-            SettingsSearchEntry(title: "Homebrew Executable", keywords: ["brew", "path", "executable"])
+            SettingsSearchEntry(title: "Homebrew executable", keywords: ["brew", "path", "executable"])
         ]
     }
 }

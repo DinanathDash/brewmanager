@@ -1,21 +1,15 @@
-# Changelog
+## [1.0.1] - 2026-09-24
 
-All notable changes to Brewmanager are documented here.
-
----
-
-## 1.0.1 - Brew Updates and UI Enhancements
-
-- Added package search functionality to the Discover tab.
-- Added HUD surface support.
-- Redesigned the Settings Pane for improved layout.
-- Added colored badges to distinguish package types (Formulae/Casks).
-- Included package descriptions directly in the UI.
-- Improved updating and installation feedback loops.
+- Added settings to view and manage installed Homebrew packages.
+- Added a package search to discover and install new Formulae and Casks.
+- Included a shelf widget to monitor Homebrew status at a glance.
+- Added an interactive HUD for quick status updates.
+- Added clear UI badges to distinguish between Formulae and Casks.
+- Included a one-click action to keep all Homebrew packages up to date.
 
 ---
 
-## 1.0.0 - Initial Release
+## [1.0.0] - 2026-09-22
 
 - Basic package viewing and management.
 - Initial DroppyKit integration with shelf widget.

@@ -3,14 +3,14 @@ import OSLog
 import DroppyKit
 
 public struct BrewPackage: Identifiable, Hashable, Sendable {
-    public var id: String { name }
+    public var id: String { "\(name)-\(isCask ? "cask" : "formula")" }
     public let name: String
     public let description: String?
     public let isCask: Bool
 }
 
 public struct OutdatedPackage: Decodable, Identifiable, Hashable, Sendable {
-    public var id: String { name }
+    public var id: String { "\(name)-\(isCask ? "cask" : "formula")" }
     public let name: String
     public let installedVersions: [String]
     public let currentVersion: String
@@ -49,7 +49,7 @@ public struct InstalledPackageVersion: Decodable, Hashable, Sendable {
 }
 
 public struct InstalledPackage: Decodable, Identifiable, Hashable, Sendable {
-    public var id: String { name }
+    public var id: String { "\(name)-\(isCask ? "cask" : "formula")" }
     public let name: String
     public let installed: [InstalledPackageVersion]?
     public let version: String?
@@ -93,37 +93,34 @@ public final class BrewService {
     public init() {}
     
     public func getExecutablePath(from preferences: any DropletPreferencesService) -> String {
-        return preferences.value(forKey: "brewExecutablePath", default: "/opt/homebrew/bin/brew")
+        let setting = preferences.value(forKey: "brewExecutablePath", default: "")
+        if !setting.isEmpty { return setting }
+        let appleSiliconPath = "/opt/homebrew/bin/brew"
+        let intelPath = "/usr/local/bin/brew"
+        if FileManager.default.fileExists(atPath: appleSiliconPath) { return appleSiliconPath }
+        if FileManager.default.fileExists(atPath: intelPath) { return intelPath }
+        return appleSiliconPath
     }
     
     public func checkVersion(executable: String) async throws -> String {
-        let output = try await runCommand(executable: executable, arguments: ["--version"])
+        let output = try await runCommand(executable: executable, arguments: ["--version"], timeout: 10)
         return output.components(separatedBy: .newlines).first ?? "Unknown"
     }
     
     public func fetchOutdated(executable: String) async throws -> OutdatedResponse {
-        let output = try await runCommand(executable: executable, arguments: ["outdated", "--json"])
-        let jsonOutput = extractJSON(from: output)
-        guard let data = jsonOutput.data(using: .utf8) else {
+        let output = try await runCommand(executable: executable, arguments: ["outdated", "--json"], timeout: 20)
+        guard let data = output.data(using: .utf8) else {
             throw NSError(domain: "BrewService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid UTF8"])
         }
         return try JSONDecoder().decode(OutdatedResponse.self, from: data)
     }
     
     public func fetchInstalled(executable: String) async throws -> InstalledResponse {
-        let output = try await runCommand(executable: executable, arguments: ["info", "--installed", "--json=v2"])
-        let jsonOutput = extractJSON(from: output)
-        guard let data = jsonOutput.data(using: .utf8) else {
+        let output = try await runCommand(executable: executable, arguments: ["info", "--installed", "--json=v2"], timeout: 30)
+        guard let data = output.data(using: .utf8) else {
             throw NSError(domain: "BrewService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid UTF8"])
         }
         return try JSONDecoder().decode(InstalledResponse.self, from: data)
-    }
-    
-    private func extractJSON(from output: String) -> String {
-        if let startIndex = output.firstIndex(of: "{") {
-            return String(output[startIndex...])
-        }
-        return output
     }
     
     public func updateBrew(executable: String) async throws {
@@ -134,20 +131,23 @@ public final class BrewService {
         _ = try await runCommand(executable: executable, arguments: ["upgrade"])
     }
     
-    public func upgradePackage(executable: String, name: String) async throws {
-        _ = try await runCommand(executable: executable, arguments: ["upgrade", name])
+    public func upgradePackage(executable: String, name: String, isCask: Bool) async throws {
+        let kind = isCask ? "--cask" : "--formula"
+        _ = try await runCommand(executable: executable, arguments: ["upgrade", kind, name])
     }
     
-    public func uninstallPackage(executable: String, name: String) async throws {
-        _ = try await runCommand(executable: executable, arguments: ["uninstall", name])
+    public func uninstallPackage(executable: String, name: String, isCask: Bool) async throws {
+        let kind = isCask ? "--cask" : "--formula"
+        _ = try await runCommand(executable: executable, arguments: ["uninstall", kind, name])
     }
     
-    public func installPackage(executable: String, name: String) async throws {
-        _ = try await runCommand(executable: executable, arguments: ["install", name])
+    public func installPackage(executable: String, name: String, isCask: Bool) async throws {
+        let kind = isCask ? "--cask" : "--formula"
+        _ = try await runCommand(executable: executable, arguments: ["install", kind, name])
     }
     
     public func searchPackages(executable: String, query: String) async throws -> [BrewPackage] {
-        let output = try await runCommand(executable: executable, arguments: ["search", "--desc", query])
+        let output = try await runCommand(executable: executable, arguments: ["desc", "--search", query], timeout: 20)
         
         var results: [BrewPackage] = []
         var parsingCasks = false
@@ -181,51 +181,104 @@ public final class BrewService {
         return results
     }
     
-    private func runCommand(executable: String, arguments: [String]) async throws -> String {
-        return try await Task.detached {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: executable)
-            process.arguments = arguments
-            
-            // Required so brew can find system tools if PATH isn't set nicely in Droppy
-            var env = ProcessInfo.processInfo.environment
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-            env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
-            process.environment = env
-            
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = pipe
-            
-            do {
-                try process.run()
-                let data = try pipe.fileHandleForReading.readToEnd() ?? Data()
-                process.waitUntilExit()
+    private func runCommand(executable: String, arguments: [String], timeout: TimeInterval? = nil) async throws -> String {
+        let isReadOnly = timeout != nil
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+        process.environment = env
+        
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        
+        final class OutputBuffer: @unchecked Sendable {
+            var data = Data()
+            private let lock = NSLock()
+            func append(_ new: Data) { lock.lock(); defer { lock.unlock() }; data.append(new) }
+            func string() -> String { lock.lock(); defer { lock.unlock() }; return String(data: data, encoding: .utf8) ?? "" }
+        }
+        
+        final class ProcessState: @unchecked Sendable {
+            var didResume = false
+            let lock = NSLock()
+        }
+        
+        return try await withTaskCancellationHandler {
+            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                let outData = OutputBuffer()
+                let errData = OutputBuffer()
                 
-                let output = String(data: data, encoding: .utf8) ?? ""
-                
-                if process.terminationStatus != 0 {
-                    throw NSError(domain: "BrewService", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: output])
-                }
-                
-                return output
-            } catch {
-                let nsError = error as NSError
-                if nsError.domain == NSCocoaErrorDomain && nsError.code == 260 {
-                    // Sandbox fallback via AppleScript
-                    let commandStr = "PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin HOMEBREW_NO_AUTO_UPDATE=1 \(executable) \(arguments.joined(separator: " "))"
-                    let appleScriptStr = "do shell script \"\(commandStr)\""
-                    if let script = NSAppleScript(source: appleScriptStr) {
-                        var scriptError: NSDictionary?
-                        let result = script.executeAndReturnError(&scriptError)
-                        if let err = scriptError {
-                            throw NSError(domain: "BrewService", code: 1, userInfo: [NSLocalizedDescriptionKey: "\(err)"])
-                        }
-                        return result.stringValue ?? ""
+                stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let chunk = handle.availableData
+                    if !chunk.isEmpty {
+                        outData.append(chunk)
+                    } else {
+                        handle.readabilityHandler = nil
                     }
                 }
-                throw error
+                
+                stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let chunk = handle.availableData
+                    if !chunk.isEmpty {
+                        errData.append(chunk)
+                    } else {
+                        handle.readabilityHandler = nil
+                    }
+                }
+                
+                let state = ProcessState()
+                
+                process.terminationHandler = { p in
+                    state.lock.lock()
+                    defer { state.lock.unlock() }
+                    
+                    if state.didResume { return }
+                    state.didResume = true
+                    
+                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                    stderrPipe.fileHandleForReading.readabilityHandler = nil
+                    
+                    if p.terminationStatus != 0 {
+                        let errorOutput = errData.string()
+                        let outOutput = outData.string()
+                        let msg = errorOutput.isEmpty ? outOutput : errorOutput
+                        continuation.resume(throwing: NSError(domain: "BrewService", code: Int(p.terminationStatus), userInfo: [NSLocalizedDescriptionKey: msg]))
+                    } else {
+                        continuation.resume(returning: outData.string())
+                    }
+                }
+                
+                do {
+                    try process.run()
+                } catch {
+                    state.lock.lock()
+                    defer { state.lock.unlock() }
+                    if !state.didResume {
+                        state.didResume = true
+                        continuation.resume(throwing: error)
+                    }
+                    return
+                }
+                
+                if let timeout = timeout {
+                    Task {
+                        try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                        if process.isRunning {
+                            process.terminate()
+                        }
+                    }
+                }
             }
-        }.value
+        } onCancel: {
+            if isReadOnly && process.isRunning {
+                process.terminate()
+            }
+        }
     }
 }

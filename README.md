@@ -1,38 +1,17 @@
 # Brewmanager
 
-A Droplet for [Droppy](https://getdroppy.app), built with
-[DroppyKit](https://getdroppy.app/docs/droppykit).
+A Droplet for [Droppy](https://getdroppy.app) to manage and monitor your Homebrew packages. Built with [DroppyKit](https://getdroppy.app/docs/droppykit).
 
 ## Features
 
-- **Discover & Install**: Search and install Homebrew packages directly from the Droplet settings pane.
-- **Update & Delete**: Update Outdated packages or uninstall unused packages.
-- **Visual Badges**: Easily identify Formula vs Cask packages.
-- **Droppy UI**: Fully integrated with the Droppy design language for a seamless experience.
+- **Discover & Install**: Search and install Homebrew packages directly from the Settings pane.
+- **Update & Delete**: Update outdated packages or uninstall unused packages.
+- **Visual Badges**: Differentiate between Formula and Cask packages at a glance.
+- **Droppy Integration**: Fully integrated with the Droppy design language for a seamless experience.
+- **Background Checks**: The shelf widget keeps you informed of pending Homebrew updates.
 
-## Developing
+## Requirements
 
-```bash
-droppykit run        # open it in Droppy's Settings panel
-droppykit build      # produce Brewmanager.droplet
-droppykit validate   # the checks a submission runs
-droppykit submit     # open the submission form, filled in from this checkout
-```
-
-## With a coding agent
-
-Open this folder in Claude Code, Codex or Cursor. `AGENTS.md` is the brief
-they read first, and `.mcp.json` / `.cursor/mcp.json` connect the DroppyKit
-MCP server, which gives them the build, the checks, pictures of every surface
-and an install into Droppy Playground as tools. Codex registers the server
-once per Mac: `codex mcp add droppykit -- path/to/droppykit/Scripts/droppykit mcp`.
-Run `droppykit agent` again after moving this folder or the SDK checkout.
-
-## Before submitting
-
-- Replace `Brewmanager.icon` with real artwork, in Icon Composer.
-- Replace `Assets/Creator.png` with your own square, unrounded mark.
-- Fill in `summary`, `description`, `creator` and `source` in `droplet.json`.
-- Push this repository, then `droppykit submit`: it opens
-  [getdroppy.app/submit-droplet](https://getdroppy.app/submit-droplet) with the
-  repository, the commit and the id filled in.
+- macOS 14+
+- Droppy v16.0.0+
+- Homebrew installed at `/opt/homebrew/bin/brew` or `/usr/local/bin/brew`. You can also configure a custom path in the Settings.

@@ -2,22 +2,20 @@
   "id": "brewmanager",
   "name": "Brew Manager",
   "version": "1.0.1",
-  "summary": "Manage Homebrew packages directly from the Dynamic Island",
-  "description": "Brew Manager is a powerful and elegant way to update, delete, and discover Homebrew packages right from your Mac's notch or menu bar.",
+  "summary": "Manage and monitor your Homebrew packages.",
+  "description": "Brew Manager provides a powerful settings interface to update, delete, and discover Homebrew packages, while offering quick status visibility right from your Droppy's shelf widget.",
   "category": "Productivity",
   "kit": {
     "abi": 1,
-    "minAPI": "1.8.1"
+    "minAPI": "1.20.1"
   },
-  "minAppVersion": "15.3.0",
+  "minAppVersion": "16.0.1",
+  "minMacOS": "26.0",
   "capabilities": [
-    "expanded-surface",
-    "apple-events",
     "hud"
   ],
   "surfaces": [
     "shelf-widget",
-    "expanded-surface",
     "settings-pane",
     "hud"
   ],
@@ -26,11 +24,20 @@
     "name": "Dinanath Dash",
     "kind": "community",
     "url": "https://dinanath.dev",
-    "avatar": "Creator.png"
+    "avatar": "Creator.png",
+    "gitlab": "DinanathDash"
   },
   "source": {
-    "repository": "https://github.com/DinanathDash/brewmanager",
+    "repository": "https://gitlab.com/droppyformac1/droplets/-/tree/main/droplets/brewmanager",
     "license": "MIT"
   },
-  "keywords": []
+  "screenshots": [],
+  "keywords": [
+    "brew",
+    "homebrew",
+    "package manager",
+    "update",
+    "cask",
+    "formulae"
+  ]
 }
