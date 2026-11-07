@@ -16,30 +16,29 @@ struct PackageDetailHostView: View {
     }
     
     var body: some View {
-        Group {
+        DropletSettingsPage {
             if let detail {
-                PackageDetailView(droplet: droplet, state: state, detail: detail)
+                PackageDetailContentView(droplet: droplet, state: state, detail: detail)
             } else {
-                DropletSettingsPage {
-                    DropletSettingsSection(header: { Text("Overview") }) {
-                        DropletSettingsCard {
-                            VStack(alignment: .leading, spacing: DroppySpacing.md) {
-                                HStack {
-                                    Text(packageName)
-                                        .font(.system(size: 20, weight: .bold))
-                                    Spacer()
-                                    ProgressView().controlSize(.small)
-                                }
-                                Text("Loading package information…")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(.secondary)
+                DropletSettingsSection(header: { Text("Overview") }) {
+                    DropletSettingsCard {
+                        VStack(alignment: .leading, spacing: DroppySpacing.md) {
+                            HStack {
+                                Text(packageName)
+                                    .font(.system(size: 20, weight: .bold))
+                                Spacer()
+                                ProgressView().controlSize(.small)
                             }
-                            .padding(.vertical, 4)
+                            Text("Loading package information…")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
             }
         }
+        .navigationTitle(detail?.displayName ?? packageName)
         .task(id: "\(packageName):\(isCask)") {
             await state.selectPackage(name: packageName, isCask: isCask)
         }
@@ -51,6 +50,19 @@ struct PackageDetailView: View {
     @ObservedObject var state: BrewState
     let detail: PackageDetail
     
+    var body: some View {
+        DropletSettingsPage {
+            PackageDetailContentView(droplet: droplet, state: state, detail: detail)
+        }
+        .navigationTitle(detail.displayName)
+    }
+}
+
+struct PackageDetailContentView: View {
+    @ObservedObject var droplet: BrewmanagerDroplet
+    @ObservedObject var state: BrewState
+    let detail: PackageDetail
+    
     @Environment(\.dropletSettingsPageOpener) private var opener
     
     private var isUpdating: Bool {
@@ -58,7 +70,7 @@ struct PackageDetailView: View {
     }
     
     private func navigateToPackage(name: String, isCask: Bool) {
-        let pageID = isCask ? "cask:\(name)" : "package:\(name)"
+        let pageID = isCask ? "cask-\(name)" : "package-\(name)"
         BrewLogger.shared.info("Navigating to dependent/dependency \(name), pageID=\(pageID), openerPresent=\(opener != nil)")
         if let opener {
             opener(page: pageID, title: name)
@@ -71,7 +83,7 @@ struct PackageDetailView: View {
     }
 
     var body: some View {
-        DropletSettingsPage {
+        Group {
             // Harness fallback back button (only shown when opener == nil in isolated harness)
             if opener == nil {
                 if !state.packageHistory.isEmpty {

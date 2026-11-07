@@ -36,7 +36,7 @@ struct SettingsPaneView: View {
     }
 
     private func navigateToPackage(name: String, isCask: Bool) {
-        let pageID = isCask ? "cask:\(name)" : "package:\(name)"
+        let pageID = isCask ? "cask-\(name)" : "package-\(name)"
         BrewLogger.shared.info("Navigating to package \(name), pageID=\(pageID), openerPresent=\(opener != nil)")
         if let opener {
             opener(page: pageID, title: name)
