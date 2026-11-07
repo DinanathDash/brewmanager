@@ -1,18 +1,19 @@
 {
   "id": "brewmanager",
   "name": "Brew Manager",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "summary": "Manage and monitor your Homebrew packages.",
   "description": "Brew Manager provides a powerful settings interface to update, delete, and discover Homebrew packages, while offering quick status visibility right from your Droppy's shelf widget.",
   "category": "Productivity",
   "kit": {
     "abi": 1,
-    "minAPI": "1.20.1"
+    "minAPI": "1.22.0"
   },
   "minAppVersion": "16.0.1",
   "minMacOS": "26.0",
   "capabilities": [
-    "hud"
+    "hud",
+    "network-client"
   ],
   "surfaces": [
     "shelf-widget",

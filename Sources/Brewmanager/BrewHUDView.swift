@@ -7,19 +7,17 @@ struct BrewHUDView: View {
     var body: some View {
         HStack(spacing: DroppySpacing.sm) {
             Image(systemName: "shippingbox.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 20, height: 20)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
             
             Spacer(minLength: 0)
             
             Text(message)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(AdaptiveColors.notchSurfacePrimaryText)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+                .lineLimit(1)
         }
         .padding(.horizontal, DroppySpacing.md)
-        .padding(.vertical, DroppySpacing.md)
+        .padding(.vertical, DroppySpacing.xs)
     }
 }

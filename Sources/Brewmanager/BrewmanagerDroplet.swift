@@ -49,7 +49,11 @@ extension BrewmanagerDroplet: ShelfWidgetProviding {
                 systemImage: "shippingbox.fill",
                 layoutTraits: ShelfWidgetLayoutTraits(
                     preferredSoloWidth: 420,
-                    preferredPairedWidth: 210
+                    preferredPairedWidth: 210,
+                    contentHeight: .fixed(136),
+                    // Alone on a Mac with a notch or the camera island, the
+                    // header row rises into the bands beside the camera.
+                    notchWrap: ShelfWidgetNotchWrapTraits(headerHeight: 34, minimumBandWidth: 64)
                 )
             )
         ]
@@ -62,8 +66,7 @@ extension BrewmanagerDroplet: ShelfWidgetProviding {
     public func makeWidgetSettingsPopover(_ id: ShelfWidgetID) -> AnyView? { nil }
 }
 
-
-// MARK: - Settings Pane
+// MARK: - Settings Pane & Pages
 
 extension BrewmanagerDroplet: SettingsPaneProviding {
     public func makeSettingsPane(context: SettingsPaneContext) -> AnyView {
@@ -77,7 +80,41 @@ extension BrewmanagerDroplet: SettingsPaneProviding {
     }
 }
 
+extension BrewmanagerDroplet: SettingsPagesProviding {
+    public func makeSettingsPage(id: String, context: SettingsPaneContext) -> AnyView? {
+        BrewLogger.shared.info("makeSettingsPage called with id: \(id)")
+        let pkgName: String
+        let isCask: Bool
+        if id.hasPrefix("cask:") {
+            pkgName = String(id.dropFirst("cask:".count))
+            isCask = true
+        } else if id.hasPrefix("cask-") {
+            pkgName = String(id.dropFirst("cask-".count))
+            isCask = true
+        } else if id.hasPrefix("package:") {
+            pkgName = String(id.dropFirst("package:".count))
+            isCask = false
+        } else if id.hasPrefix("package-") {
+            pkgName = String(id.dropFirst("package-".count))
+            isCask = false
+        } else if id.hasPrefix("formula:") {
+            pkgName = String(id.dropFirst("formula:".count))
+            isCask = false
+        } else if id.hasPrefix("formula-") {
+            pkgName = String(id.dropFirst("formula-".count))
+            isCask = false
+        } else if id == "package-detail", let current = state.selectedPackageDetail {
+            pkgName = current.name
+            isCask = current.isCask
+        } else {
+            pkgName = id
+            isCask = false
+        }
+        
+        return AnyView(PackageDetailHostView(droplet: self, state: state, packageName: pkgName, isCask: isCask))
+    }
+}
+
 // MARK: - HUD
 
 extension BrewmanagerDroplet: HUDPresenting {}
-

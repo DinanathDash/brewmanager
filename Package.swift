@@ -12,7 +12,7 @@ let package = Package(
         .library(name: "Brewmanager", type: .dynamic, targets: ["Brewmanager"])
     ],
     dependencies: [
-        .package(url: "https://gitlab.com/droppyformac1/droppykit.git", from: "1.20.1")
+        .package(url: "https://gitlab.com/droppyformac1/droppykit.git", from: "1.22.0")
     ],
     targets: [
         .target(
