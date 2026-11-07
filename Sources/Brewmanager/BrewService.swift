@@ -229,7 +229,7 @@ public final class BrewService {
     public init() {}
     
     public func getExecutablePath(from preferences: any DropletPreferencesService) -> String {
-        let setting = preferences.value(forKey: "brewExecutablePath", default: "")
+        let setting = preferences.value(forKey: "brewExecutablePath", default: "").trimmingCharacters(in: .whitespaces)
         if !setting.isEmpty { return setting }
         let appleSiliconPath = "/opt/homebrew/bin/brew"
         let intelPath = "/usr/local/bin/brew"
@@ -282,7 +282,7 @@ public final class BrewService {
                 dependents = usesOutput
                     .components(separatedBy: .whitespacesAndNewlines)
                     .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty && !$0.hasPrefix("Warning:") }
+                    .filter { !$0.isEmpty && !$0.hasPrefix("Warning:") && !$0.hasPrefix("Error:") }
             }
         }
         
@@ -452,14 +452,25 @@ public final class BrewService {
         _ = try await runCommand(executable: executable, arguments: ["install", kind, name])
     }
     
-    public func searchPackages(executable: String, query: String) async throws -> [BrewPackage] {
-        let output = try await runCommand(executable: executable, arguments: ["desc", "--search", query], timeout: 20)
-        
+    public static func parseSearchOutput(_ output: String) -> [BrewPackage] {
         var results: [BrewPackage] = []
         var parsingCasks = false
         
-        for line in output.components(separatedBy: .newlines) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+        // Strip ANSI escape codes
+        let ansiRegex = try? NSRegularExpression(pattern: #"\x1b\[[0-9;]*[a-zA-Z]"#)
+        let cleanOutput: String
+        if let regex = ansiRegex {
+            cleanOutput = regex.stringByReplacingMatches(
+                in: output,
+                range: NSRange(output.startIndex..., in: output),
+                withTemplate: ""
+            )
+        } else {
+            cleanOutput = output
+        }
+        
+        for rawLine in cleanOutput.components(separatedBy: .newlines) {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty { continue }
             
             if trimmed.hasPrefix("==> Casks") {
@@ -469,7 +480,12 @@ public final class BrewService {
                 parsingCasks = false
                 continue
             } else if trimmed.hasPrefix("==>") {
-                continue // Skip other headers
+                continue
+            }
+            
+            // Skip CLI warning and error messages
+            if trimmed.hasPrefix("Warning:") || trimmed.hasPrefix("Error:") || trimmed.hasPrefix("Notice:") {
+                continue
             }
             
             // Expected format: "name: description"
@@ -478,12 +494,20 @@ public final class BrewService {
                 let descStart = trimmed.index(after: colonIndex)
                 let description = String(trimmed[descStart...]).trimmingCharacters(in: .whitespaces)
                 
-                results.append(BrewPackage(name: name, description: description, isCask: parsingCasks))
-            } else {
+                // Package names in Homebrew do not contain spaces
+                if !name.isEmpty && !name.contains(" ") {
+                    results.append(BrewPackage(name: name, description: description.isEmpty ? nil : description, isCask: parsingCasks))
+                }
+            } else if !trimmed.contains(" ") {
                 results.append(BrewPackage(name: trimmed, description: nil, isCask: parsingCasks))
             }
         }
         return results
+    }
+    
+    public func searchPackages(executable: String, query: String) async throws -> [BrewPackage] {
+        let output = try await runCommand(executable: executable, arguments: ["desc", "--search", query], timeout: 20)
+        return Self.parseSearchOutput(output)
     }
     
     private func runCommand(executable: String, arguments: [String], timeout: TimeInterval? = nil) async throws -> String {
@@ -507,7 +531,7 @@ public final class BrewService {
             var data = Data()
             private let lock = NSLock()
             func append(_ new: Data) { lock.lock(); defer { lock.unlock() }; data.append(new) }
-            func string() -> String { lock.lock(); defer { lock.unlock() }; return String(data: data, encoding: .utf8) ?? "" }
+            func string() -> String { lock.lock(); defer { lock.unlock() }; return String(decoding: data, as: UTF8.self) }
         }
         
         final class ProcessState: @unchecked Sendable {
@@ -549,6 +573,12 @@ public final class BrewService {
                     
                     stdoutPipe.fileHandleForReading.readabilityHandler = nil
                     stderrPipe.fileHandleForReading.readabilityHandler = nil
+                    
+                    // Drain remaining buffered data from the pipe handles
+                    let remainingOut = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                    if !remainingOut.isEmpty { outData.append(remainingOut) }
+                    let remainingErr = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    if !remainingErr.isEmpty { errData.append(remainingErr) }
                     
                     if p.terminationStatus != 0 {
                         let errorOutput = errData.string()

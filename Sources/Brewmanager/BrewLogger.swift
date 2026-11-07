@@ -54,9 +54,9 @@ public final class BrewLogger: @unchecked Sendable {
     ) {
         self.logDirectory = logDirectory ?? Self.defaultLogDirectory
         self.fileName = fileName
-        self.maxFileSize = maxFileSize
-        self.maxBackups = maxBackups
-        self.maxAgeDays = maxAgeDays
+        self.maxFileSize = max(maxFileSize, 50)
+        self.maxBackups = max(maxBackups, 0)
+        self.maxAgeDays = max(maxAgeDays, 0.1)
 
         queue.sync {
             self.prepareLogFile()
@@ -186,9 +186,13 @@ public final class BrewLogger: @unchecked Sendable {
         }
 
         let current = currentFileURL
-        if fileManager.fileExists(atPath: current.path) && maxBackups > 0 {
-            let backup1 = backupFileURL(index: 1)
-            try? fileManager.moveItem(at: current, to: backup1)
+        if fileManager.fileExists(atPath: current.path) {
+            if maxBackups > 0 {
+                let backup1 = backupFileURL(index: 1)
+                try? fileManager.moveItem(at: current, to: backup1)
+            } else {
+                try? fileManager.removeItem(at: current)
+            }
         }
 
         prepareLogFile()
@@ -252,7 +256,8 @@ public enum BrewLogExporter {
         }
 
         let dateString = dateFormatter.string(from: date)
-        let archiveName = "BrewManager-Logs-\(dateString).zip"
+        let uniqueSuffix = UUID().uuidString.prefix(6)
+        let archiveName = "BrewManager-Logs-\(dateString)-\(uniqueSuffix).zip"
         let archiveURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(archiveName)
 
         if fileManager.fileExists(atPath: archiveURL.path) {

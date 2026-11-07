@@ -59,6 +59,21 @@ jobs:
               env_file.write(f'release_name={release_name}\n')
           "
 
+      - name: Setup DroppyKit CLI
+        run: |
+          git clone --depth 1 https://gitlab.com/droppyformac1/droppykit.git ../droppykit
+          chmod +x ../droppykit/Scripts/droppykit
+          echo "$(cd ../droppykit/Scripts && pwd)" >> $GITHUB_PATH
+
+      - name: Run Tests
+        run: swift test
+
+      - name: Build Droplet
+        run: droppykit build
+
+      - name: Validate Droplet
+        run: droppykit validate
+
       - name: Push Git Tag
         run: |
           # Configure Git
@@ -73,18 +88,6 @@ jobs:
             git tag -f "v${{ env.version }}"
             git push origin "v${{ env.version }}"
           fi
-
-      - name: Setup DroppyKit CLI
-        run: |
-          git clone --depth 1 https://gitlab.com/droppyformac1/droppykit.git ../droppykit
-          chmod +x ../droppykit/Scripts/droppykit
-          echo "$(cd ../droppykit/Scripts && pwd)" >> $GITHUB_PATH
-
-      - name: Build Droplet
-        run: droppykit build
-
-      - name: Validate Droplet
-        run: droppykit validate
 
       - name: Create ZIP Archive
         run: |

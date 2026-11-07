@@ -83,32 +83,43 @@ extension BrewmanagerDroplet: SettingsPaneProviding {
 extension BrewmanagerDroplet: SettingsPagesProviding {
     public func makeSettingsPage(id: String, context: SettingsPaneContext) -> AnyView? {
         BrewLogger.shared.info("makeSettingsPage called with id: \(id)")
+        let lower = id.lowercased()
         let pkgName: String
         let isCask: Bool
-        if id.hasPrefix("cask:") {
-            pkgName = String(id.dropFirst("cask:".count))
+        
+        if lower.hasPrefix("cask:") {
+            pkgName = String(id.dropFirst("cask:".count)).trimmingCharacters(in: .whitespaces)
             isCask = true
-        } else if id.hasPrefix("cask-") {
-            pkgName = String(id.dropFirst("cask-".count))
-            isCask = true
-        } else if id.hasPrefix("package:") {
-            pkgName = String(id.dropFirst("package:".count))
+        } else if lower.hasPrefix("package:") {
+            pkgName = String(id.dropFirst("package:".count)).trimmingCharacters(in: .whitespaces)
             isCask = false
-        } else if id.hasPrefix("package-") {
-            pkgName = String(id.dropFirst("package-".count))
+        } else if lower.hasPrefix("formula:") {
+            pkgName = String(id.dropFirst("formula:".count)).trimmingCharacters(in: .whitespaces)
             isCask = false
-        } else if id.hasPrefix("formula:") {
-            pkgName = String(id.dropFirst("formula:".count))
+        } else if lower.hasPrefix("cask-") {
+            // Check if exact name exists as formula (e.g. formula 'cask-repair')
+            let candidate = String(id.dropFirst("cask-".count)).trimmingCharacters(in: .whitespaces)
+            if state.installedPackages.contains(where: { $0.name.caseInsensitiveCompare(id) == .orderedSame && !$0.isCask }) {
+                pkgName = id
+                isCask = false
+            } else {
+                pkgName = candidate
+                isCask = true
+            }
+        } else if lower.hasPrefix("package-") {
+            pkgName = String(id.dropFirst("package-".count)).trimmingCharacters(in: .whitespaces)
             isCask = false
-        } else if id.hasPrefix("formula-") {
-            pkgName = String(id.dropFirst("formula-".count))
+        } else if lower.hasPrefix("formula-") {
+            pkgName = String(id.dropFirst("formula-".count)).trimmingCharacters(in: .whitespaces)
             isCask = false
         } else if id == "package-detail", let current = state.selectedPackageDetail {
             pkgName = current.name
             isCask = current.isCask
         } else {
-            pkgName = id
-            isCask = false
+            pkgName = id.trimmingCharacters(in: .whitespaces)
+            isCask = state.installedPackages.first(where: { $0.name.caseInsensitiveCompare(pkgName) == .orderedSame })?.isCask
+                ?? state.outdatedPackages.first(where: { $0.name.caseInsensitiveCompare(pkgName) == .orderedSame })?.isCask
+                ?? false
         }
         
         return AnyView(PackageDetailHostView(droplet: self, state: state, packageName: pkgName, isCask: isCask))

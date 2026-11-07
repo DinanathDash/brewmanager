@@ -39,11 +39,16 @@ public final class BrewState: ObservableObject {
     public init() {}
     
     private func cacheKey(name: String, isCask: Bool) -> String {
-        "\(name.lowercased()):\(isCask ? "cask" : "formula")"
+        let cleanName = name.trimmingCharacters(in: .whitespaces).lowercased()
+        return "\(cleanName):\(isCask ? "cask" : "formula")"
     }
     
     public func cachedPackageDetail(name: String, isCask: Bool) -> PackageDetail? {
         packageDetailCache[cacheKey(name: name, isCask: isCask)]
+    }
+    
+    public func setCachedPackageDetail(_ detail: PackageDetail) {
+        packageDetailCache[cacheKey(name: detail.name, isCask: detail.isCask)] = detail
     }
     
     public func attach(host: DropletHost) {
@@ -60,6 +65,13 @@ public final class BrewState: ObservableObject {
         host = nil
         activeGeneration = UUID()
         clearActivity()
+        isLoading = false
+        isUpdatingBrew = false
+        isUpdatingAll = false
+        isSearching = false
+        isLoadingDetail = false
+        updatingPackageNames.removeAll()
+        installingPackages.removeAll()
         BrewLogger.shared.info("BrewState detached")
     }
     
@@ -90,6 +102,11 @@ public final class BrewState: ObservableObject {
         let gen = generation ?? activeGeneration
         isLoading = true
         errorMessage = nil
+        defer {
+            if gen == activeGeneration {
+                isLoading = false
+            }
+        }
         
         do {
             async let v = service.checkVersion(executable: executablePath)
@@ -110,7 +127,7 @@ public final class BrewState: ObservableObject {
             BrewLogger.shared.error("Refresh failed: \(error.localizedDescription)")
         }
         
-        isLoading = false
+        guard gen == activeGeneration, !Task.isCancelled else { return }
         
         if errorMessage == nil {
             isRefreshSuccess = true
@@ -121,6 +138,11 @@ public final class BrewState: ObservableObject {
     public func updateBrew() async {
         let gen = activeGeneration
         isUpdatingBrew = true
+        defer {
+            if gen == activeGeneration {
+                isUpdatingBrew = false
+            }
+        }
         BrewLogger.shared.info("Updating Homebrew...")
         do {
             try await service.updateBrew(executable: executablePath)
@@ -133,7 +155,6 @@ public final class BrewState: ObservableObject {
         }
         
         guard gen == activeGeneration, !Task.isCancelled else { return }
-        isUpdatingBrew = false
         
         if errorMessage == nil {
             isUpdateSuccess = true
@@ -144,6 +165,11 @@ public final class BrewState: ObservableObject {
     public func upgradeAll() async {
         let gen = activeGeneration
         isUpdatingAll = true
+        defer {
+            if gen == activeGeneration {
+                isUpdatingAll = false
+            }
+        }
         BrewLogger.shared.info("Upgrading all packages...")
         do {
             try await service.upgradeAll(executable: executablePath)
@@ -168,46 +194,53 @@ public final class BrewState: ObservableObject {
             self.errorMessage = "Upgrade failed: \(error.localizedDescription)"
             BrewLogger.shared.error("Upgrade all failed: \(error.localizedDescription)")
         }
-        guard gen == activeGeneration, !Task.isCancelled else { return }
-        isUpdatingAll = false
     }
     
-    public func selectPackage(name: String, isCask: Bool) async {
+    public func selectPackage(name: String, isCask: Bool, forceRefresh: Bool = false) async {
         let gen = activeGeneration
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
         isLoadingDetail = true
+        defer {
+            if gen == activeGeneration {
+                isLoadingDetail = false
+            }
+        }
         
-        // If already cached or current matches, preserve it for instant display
-        if let cached = cachedPackageDetail(name: name, isCask: isCask) {
+        // If already cached and not forcing refresh, return immediately
+        if !forceRefresh, let cached = cachedPackageDetail(name: trimmedName, isCask: isCask) {
             self.selectedPackageDetail = cached
-        } else if selectedPackageDetail?.name.caseInsensitiveCompare(name) != .orderedSame || selectedPackageDetail?.isCask != isCask {
+            return
+        }
+        
+        if selectedPackageDetail?.name.caseInsensitiveCompare(trimmedName) != .orderedSame || selectedPackageDetail?.isCask != isCask {
             self.selectedPackageDetail = nil
         }
         
         do {
-            let detail = try await service.fetchPackageDetail(executable: executablePath, name: name, isCask: isCask)
+            let detail = try await service.fetchPackageDetail(executable: executablePath, name: trimmedName, isCask: isCask)
             guard gen == activeGeneration, !Task.isCancelled else {
-                BrewLogger.shared.info("selectPackage cancelled or generation mismatch for \(name)")
+                BrewLogger.shared.info("selectPackage cancelled or generation mismatch for \(trimmedName)")
                 return
             }
             self.selectedPackageDetail = detail
-            self.packageDetailCache[cacheKey(name: name, isCask: isCask)] = detail
-            BrewLogger.shared.info("selectPackage successfully loaded detail for \(name)")
+            self.packageDetailCache[cacheKey(name: trimmedName, isCask: isCask)] = detail
+            BrewLogger.shared.info("selectPackage successfully loaded detail for \(trimmedName)")
         } catch {
             guard gen == activeGeneration, !Task.isCancelled else { return }
-            host?.log.notice("Could not fetch full details for \(name): \(error.localizedDescription)")
-            BrewLogger.shared.notice("Could not fetch full details for \(name): \(error.localizedDescription)")
+            host?.log.notice("Could not fetch full details for \(trimmedName): \(error.localizedDescription)")
+            BrewLogger.shared.notice("Could not fetch full details for \(trimmedName): \(error.localizedDescription)")
             
             // If fetch fails and no cached detail exists, build best-effort fallback
             if self.selectedPackageDetail == nil {
-                let existingInstalled = installedPackages.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame && $0.isCask == isCask })
-                let existingOutdated = outdatedPackages.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame && $0.isCask == isCask })
-                let existingSearch = searchResults.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame && $0.isCask == isCask })
+                let existingInstalled = installedPackages.first(where: { $0.name.caseInsensitiveCompare(trimmedName) == .orderedSame && $0.isCask == isCask })
+                let existingOutdated = outdatedPackages.first(where: { $0.name.caseInsensitiveCompare(trimmedName) == .orderedSame && $0.isCask == isCask })
+                let existingSearch = searchResults.first(where: { $0.name.caseInsensitiveCompare(trimmedName) == .orderedSame && $0.isCask == isCask })
                 
                 let installedVer = existingInstalled?.installed?.first?.version ?? existingInstalled?.version
                 let currentVer = existingOutdated?.currentVersion ?? (existingInstalled != nil && existingOutdated == nil ? installedVer : nil) ?? "Unknown"
                 let fallback = PackageDetail(
-                    name: name,
-                    displayName: name,
+                    name: trimmedName,
+                    displayName: trimmedName,
                     isCask: isCask,
                     tap: isCask ? "homebrew/cask" : "homebrew/core",
                     desc: existingInstalled?.desc ?? existingSearch?.description,
@@ -228,19 +261,25 @@ public final class BrewState: ObservableObject {
                     installedSize: nil
                 )
                 self.selectedPackageDetail = fallback
-                self.packageDetailCache[cacheKey(name: name, isCask: isCask)] = fallback
+                self.packageDetailCache[cacheKey(name: trimmedName, isCask: isCask)] = fallback
             }
         }
-        
-        guard gen == activeGeneration, !Task.isCancelled else { return }
-        isLoadingDetail = false
     }
     
     public func navigateToPackage(name: String, isCask: Bool) async {
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
         if let current = selectedPackageDetail {
+            if current.name.caseInsensitiveCompare(trimmedName) == .orderedSame && current.isCask == isCask {
+                // Same package: refresh without duplicate backstack entry
+                await selectPackage(name: trimmedName, isCask: isCask)
+                return
+            }
+            if packageHistory.count >= 50 {
+                packageHistory.removeFirst()
+            }
             packageHistory.append(current)
         }
-        await selectPackage(name: name, isCask: isCask)
+        await selectPackage(name: trimmedName, isCask: isCask)
     }
     
     public func popPackageHistory() {
@@ -261,6 +300,9 @@ public final class BrewState: ObservableObject {
         let gen = activeGeneration
         let pkgId = "\(name)-\(isCask ? "cask" : "formula")"
         updatingPackageNames.insert(pkgId)
+        defer {
+            updatingPackageNames.remove(pkgId)
+        }
         BrewLogger.shared.info("Upgrading package \(name)...")
         do {
             try await service.upgradePackage(executable: executablePath, name: name, isCask: isCask)
@@ -301,7 +343,7 @@ public final class BrewState: ObservableObject {
             
             await refresh(generation: gen)
             if selectedPackageDetail?.name == name && selectedPackageDetail?.isCask == isCask {
-                await selectPackage(name: name, isCask: isCask)
+                await selectPackage(name: name, isCask: isCask, forceRefresh: true)
             }
             guard gen == activeGeneration, !Task.isCancelled else { return }
             _ = host?.hud.present(DropletHUDRequest(
@@ -322,8 +364,6 @@ public final class BrewState: ObservableObject {
             self.errorMessage = "Upgrade failed for \(name): \(error.localizedDescription)"
             BrewLogger.shared.error("Upgrade failed for \(name): \(error.localizedDescription)")
         }
-        guard gen == activeGeneration, !Task.isCancelled else { return }
-        updatingPackageNames.remove(pkgId)
     }
     
     public func upgrade(package: OutdatedPackage) async {
@@ -334,6 +374,9 @@ public final class BrewState: ObservableObject {
         let gen = activeGeneration
         let pkgId = "\(name)-\(isCask ? "cask" : "formula")"
         updatingPackageNames.insert(pkgId)
+        defer {
+            updatingPackageNames.remove(pkgId)
+        }
         BrewLogger.shared.info("Uninstalling package \(name)...")
         do {
             try await service.uninstallPackage(executable: executablePath, name: name, isCask: isCask)
@@ -349,7 +392,7 @@ public final class BrewState: ObservableObject {
             
             await refresh(generation: gen)
             if selectedPackageDetail?.name == name && selectedPackageDetail?.isCask == isCask {
-                await selectPackage(name: name, isCask: isCask)
+                await selectPackage(name: name, isCask: isCask, forceRefresh: true)
             }
             guard gen == activeGeneration, !Task.isCancelled else { return }
             _ = host?.hud.present(DropletHUDRequest(
@@ -370,8 +413,6 @@ public final class BrewState: ObservableObject {
             self.errorMessage = "Uninstall failed for \(name): \(error.localizedDescription)"
             BrewLogger.shared.error("Uninstall failed for \(name): \(error.localizedDescription)")
         }
-        guard gen == activeGeneration, !Task.isCancelled else { return }
-        updatingPackageNames.remove(pkgId)
     }
     
     public func uninstall(package: InstalledPackage) async {
@@ -382,13 +423,16 @@ public final class BrewState: ObservableObject {
         let gen = activeGeneration
         let pkgId = "\(name)-\(isCask ? "cask" : "formula")"
         installingPackages.insert(pkgId)
+        defer {
+            installingPackages.remove(pkgId)
+        }
         BrewLogger.shared.info("Installing package \(name)...")
         do {
             try await service.installPackage(executable: executablePath, name: name, isCask: isCask)
             guard gen == activeGeneration, !Task.isCancelled else { return }
             await refresh(generation: gen)
             if selectedPackageDetail?.name == name && selectedPackageDetail?.isCask == isCask {
-                await selectPackage(name: name, isCask: isCask)
+                await selectPackage(name: name, isCask: isCask, forceRefresh: true)
             }
             guard gen == activeGeneration, !Task.isCancelled else { return }
             _ = host?.hud.present(DropletHUDRequest(
@@ -409,8 +453,6 @@ public final class BrewState: ObservableObject {
             self.errorMessage = "Install failed for \(name): \(error.localizedDescription)"
             BrewLogger.shared.error("Install failed for \(name): \(error.localizedDescription)")
         }
-        guard gen == activeGeneration, !Task.isCancelled else { return }
-        installingPackages.remove(pkgId)
     }
     
     public func install(package: BrewPackage) async {
@@ -429,6 +471,11 @@ public final class BrewState: ObservableObject {
         
         isSearching = true
         errorMessage = nil
+        defer {
+            if gen == activeGeneration {
+                isSearching = false
+            }
+        }
         BrewLogger.shared.info("Searching packages: \(trimmedQuery)")
         do {
             let res = try await service.searchPackages(executable: executablePath, query: trimmedQuery)
@@ -440,7 +487,5 @@ public final class BrewState: ObservableObject {
             BrewLogger.shared.error("Search failed for \(trimmedQuery): \(error.localizedDescription)")
             self.searchResults = []
         }
-        guard gen == activeGeneration, !Task.isCancelled else { return }
-        isSearching = false
     }
 }

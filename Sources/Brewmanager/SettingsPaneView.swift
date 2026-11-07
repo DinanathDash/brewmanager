@@ -18,10 +18,11 @@ struct SettingsPaneView: View {
                 state.outdatedPackages.contains(where: { $0.id == pkg.id })
             }
         }
-        if !searchText.isEmpty {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
             pkgs = pkgs.filter { pkg in
-                let matchesName = pkg.name.localizedCaseInsensitiveContains(searchText)
-                let matchesDesc = pkg.desc?.localizedCaseInsensitiveContains(searchText) ?? false
+                let matchesName = pkg.name.localizedCaseInsensitiveContains(query)
+                let matchesDesc = pkg.desc?.localizedCaseInsensitiveContains(query) ?? false
                 return matchesName || matchesDesc
             }
         }

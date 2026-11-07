@@ -25,6 +25,13 @@ let package = Package(
                 "Brewmanager",
                 .product(name: "DroppyKitHarness", package: "droppykit")
             ]
+        ),
+        .testTarget(
+            name: "BrewmanagerTests",
+            dependencies: [
+                "Brewmanager",
+                .product(name: "DroppyKitHarness", package: "droppykit")
+            ]
         )
     ]
 )
